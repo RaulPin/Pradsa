@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Homepty Entrevistas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app__header">
+        <h1>Homepty · Entrevista 1 a 1</h1>
+        <p>Comparte el identificador de sala con tu entrevistador o candidato y empieza la videollamada.</p>
+      </header>
+
+      <section class="session" id="session">
+        <form id="join-form" class="session__form">
+          <label for="room-id">ID de la sala</label>
+          <input id="room-id" type="text" placeholder="Ej. entrevista-abc123" required />
+          <button type="submit" class="primary">Unirme a la sala</button>
+        </form>
+
+        <div class="session__status" id="status"></div>
+      </section>
+
+      <main class="call" id="call" hidden>
+        <div class="call__videos">
+          <div class="video-wrapper">
+            <video id="local-video" playsinline autoplay muted></video>
+            <span class="video-label">Tú</span>
+          </div>
+          <div class="video-wrapper">
+            <video id="remote-video" playsinline autoplay></video>
+            <span class="video-label" id="remote-label">Invitado</span>
+          </div>
+        </div>
+
+        <aside class="call__sidebar">
+          <h2>Notas de la entrevista</h2>
+          <textarea id="notes" placeholder="Escribe notas rápidas (solo visibles para ti)"></textarea>
+          <div class="timer" id="timer">00:00</div>
+          <div class="quality" id="quality"></div>
+        </aside>
+
+        <div class="call__controls">
+          <button id="toggle-audio" class="control">Silenciar audio</button>
+          <button id="toggle-video" class="control">Pausar video</button>
+          <button id="share-screen" class="control">Compartir pantalla</button>
+          <button id="leave" class="control danger">Salir</button>
+        </div>
+      </main>
+
+      <footer class="app__footer">
+        <small>La conexión se establece directamente entre los navegadores utilizando WebRTC. El servidor solo gestiona la señalización.</small>
+      </footer>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
