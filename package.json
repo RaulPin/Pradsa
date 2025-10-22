@@ -1,0 +1,18 @@
+{
+  "name": "homepty",
+  "version": "1.0.0",
+  "description": "Aplicación web de entrevistas 1 a 1 con videollamada WebRTC y servidor de señalización minimalista.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "webrtc",
+    "video",
+    "interview",
+    "signaling"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs"
+}
