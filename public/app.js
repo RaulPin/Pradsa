@@ -1,1075 +1,795 @@
-const joinForm = document.getElementById('join-form');
-const roomInput = document.getElementById('room-id');
-const statusEl = document.getElementById('status');
-const sessionSection = document.getElementById('session');
-const callSection = document.getElementById('call');
-const localVideo = document.getElementById('local-video');
-const remoteVideo = document.getElementById('remote-video');
-const remoteLabel = document.getElementById('remote-label');
-const toggleAudioBtn = document.getElementById('toggle-audio');
-const toggleVideoBtn = document.getElementById('toggle-video');
-const shareScreenBtn = document.getElementById('share-screen');
-const leaveBtn = document.getElementById('leave');
-const timerEl = document.getElementById('timer');
-const qualityEl = document.getElementById('quality');
-const localLocationEl = document.getElementById('local-location');
-const remoteLocationEl = document.getElementById('remote-location');
-const distanceEl = document.getElementById('distance');
-const questionListEl = document.getElementById('question-list');
-const generalNotesEl = document.getElementById('notes');
-const downloadDocxBtn = document.getElementById('download-docx');
-const downloadTextBtn = document.getElementById('download-text');
+'use strict';
 
-const INTERVIEW_QUESTIONS = [
-  { id: 'presentacion', prompt: '¿Puedes contarme brevemente sobre tu experiencia reciente?' },
-  { id: 'logros', prompt: '¿Cuál consideras que ha sido tu mayor logro profesional y por qué?' },
-  { id: 'colaboracion', prompt: 'Describe una situación en la que colaboraste para resolver un desafío complejo.' },
-  { id: 'aprendizaje', prompt: '¿Qué aprendiste de tu último proyecto o rol que te gustaría aplicar aquí?' },
-  { id: 'expectativas', prompt: '¿Qué esperas del puesto y del equipo si te incorporas?' },
-];
+// ─── State ────────────────────────────────────────────────────────────────────
 
-let ws;
-let peerConnection;
-let localStream;
-let screenStream;
-let callStart;
-let timerInterval;
-let qualityInterval;
-let isInitiator = false;
-let lastVideoStats;
-let clientId;
-let localLocation;
-let remoteLocation;
-let geolocationWatchId = null;
-let lastLocationSent = null;
-let lastLocationSentAt = 0;
-let lastGeolocationErrorMessage = null;
-let notesExportedAutomatically = false;
-
-renderInterviewQuestions();
-attachNotesActions();
-
-const iceServers = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-];
-const hasGeolocationSupport = 'geolocation' in navigator;
-const GEOLOCATION_OPTIONS = {
-  enableHighAccuracy: true,
-  timeout: 15000,
-  maximumAge: 5000,
+const S = {
+  token:       localStorage.getItem('pradsa_token') || null,
+  user:        JSON.parse(localStorage.getItem('pradsa_user') || 'null'),
+  map:         null,
+  markers:     {},
+  mapInterval: null,
 };
 
-function renderInterviewQuestions() {
-  if (!questionListEl) return;
-  questionListEl.innerHTML = '';
-  INTERVIEW_QUESTIONS.forEach((question, index) => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'notes__item';
+// ─── API helper ───────────────────────────────────────────────────────────────
 
-    const title = document.createElement('p');
-    title.className = 'notes__question';
-    title.textContent = `${index + 1}. ${question.prompt}`;
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (S.token) opts.headers['Authorization'] = `Bearer ${S.token}`;
+  if (body)    opts.body = JSON.stringify(body);
 
-    const textarea = document.createElement('textarea');
-    textarea.className = 'notes__response';
-    textarea.placeholder = 'Escribe la respuesta…';
-    textarea.dataset.questionId = question.id;
+  const res  = await fetch(`/api${path}`, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
 
-    wrapper.append(title, textarea);
-    questionListEl.append(wrapper);
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+function saveAuth(token, user) {
+  S.token = token; S.user = user;
+  localStorage.setItem('pradsa_token', token);
+  localStorage.setItem('pradsa_user', JSON.stringify(user));
+}
+
+function clearAuth() {
+  S.token = null; S.user = null;
+  localStorage.removeItem('pradsa_token');
+  localStorage.removeItem('pradsa_user');
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+function toast(msg, type = 'success') {
+  let c = document.getElementById('toast-container');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'toast-container';
+    c.className = 'toast-container';
+    document.body.appendChild(c);
+  }
+  const t = document.createElement('div');
+  t.className = `toast toast--${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const initials = n => (n || '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+}
+function formatTime(d) {
+  if (!d) return null;
+  return new Date(d).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+}
+function timeAgo(d) {
+  if (!d) return '—';
+  const m = Math.floor((Date.now() - new Date(d)) / 60000);
+  if (m < 1)  return 'ahora';
+  if (m < 60) return `hace ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h}h`;
+  return `hace ${Math.floor(h/24)}d`;
+}
+function calcHours(ci, co) {
+  if (!ci || !co) return '—';
+  const diff = new Date(co) - new Date(ci);
+  return `${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m`;
+}
+
+const PRIORITY_LABEL = { low:'Baja', medium:'Media', high:'Alta', urgent:'Urgente' };
+const STATUS_LABEL   = { pending:'Pendiente', in_progress:'En progreso', completed:'Completada', cancelled:'Cancelada' };
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
+const PAGES = { dashboard: pageDashboard, employees: pageEmployees, tasks: pageTasks, map: pageMap, attendance: pageAttendance };
+const PAGE_TITLES = { dashboard:'Dashboard', employees:'Empleados', tasks:'Tareas', map:'Mapa de empleados', attendance:'Asistencia' };
+
+function navigate(page) {
+  if (!S.token) { renderLogin(); return; }
+  if (!PAGES[page]) page = 'dashboard';
+
+  // Stop map polling when leaving the map page
+  if (page !== 'map') stopMap();
+
+  location.hash = page;
+
+  document.querySelectorAll('.sidebar__nav a').forEach(a =>
+    a.classList.toggle('active', a.dataset.page === page)
+  );
+  const h1 = document.querySelector('.topbar h1');
+  if (h1) h1.textContent = PAGE_TITLES[page] || '';
+
+  const content = document.getElementById('page-content');
+  if (content) PAGES[page](content);
+}
+
+function stopMap() {
+  if (S.mapInterval) { clearInterval(S.mapInterval); S.mapInterval = null; }
+  if (S.map) { S.map.remove(); S.map = null; S.markers = {}; }
+}
+
+// ─── App Shell ────────────────────────────────────────────────────────────────
+
+function renderShell() {
+  document.getElementById('app').innerHTML = `
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar__logo">
+          <h2>Prad<span>sa</span></h2>
+          <p>Panel de administración</p>
+        </div>
+        <ul class="sidebar__nav">
+          <li><a href="#" data-page="dashboard"><span class="nav-icon">⊞</span>Dashboard</a></li>
+          <li><a href="#" data-page="employees"><span class="nav-icon">👥</span>Empleados</a></li>
+          <li><a href="#" data-page="tasks"><span class="nav-icon">☑</span>Tareas</a></li>
+          <li><a href="#" data-page="map"><span class="nav-icon">📍</span>Mapa</a></li>
+          <li><a href="#" data-page="attendance"><span class="nav-icon">📅</span>Asistencia</a></li>
+        </ul>
+        <div class="sidebar__footer">
+          <div class="sidebar__user">
+            <div class="avatar">${initials(S.user?.name)}</div>
+            <div class="sidebar__user-info">
+              <strong>${esc(S.user?.name)}</strong>
+              <small>${esc(S.user?.role === 'admin' ? 'Administrador' : S.user?.role)}</small>
+            </div>
+            <button class="btn-icon" id="logout-btn" title="Cerrar sesión">⏻</button>
+          </div>
+        </div>
+      </aside>
+      <div class="main">
+        <div class="topbar">
+          <h1>Dashboard</h1>
+          <span class="topbar__date">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span>
+        </div>
+        <div class="page-content" id="page-content">
+          <div class="loader"><div class="spinner"></div>Cargando...</div>
+        </div>
+      </div>
+    </div>`;
+
+  document.querySelectorAll('.sidebar__nav a').forEach(a =>
+    a.addEventListener('click', e => { e.preventDefault(); navigate(a.dataset.page); })
+  );
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    clearAuth();
+    renderLogin();
   });
 }
 
-function attachNotesActions() {
-  downloadDocxBtn?.addEventListener('click', () => {
-    const notesData = collectInterviewNotes();
-    if (!hasInterviewContent(notesData)) {
-      updateStatus('Completa alguna respuesta para poder descargarla.');
-      return;
-    }
+// ─── Login ────────────────────────────────────────────────────────────────────
+
+function renderLogin() {
+  stopMap();
+  document.getElementById('app').innerHTML = `
+    <div class="login-page">
+      <div class="login-card">
+        <div class="login-card__logo">Prad<span>sa</span></div>
+        <p class="login-card__sub">Plataforma de monitoreo de personal</p>
+        <div id="login-err"></div>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="le">Correo electrónico</label>
+            <input id="le" name="email" type="email" required placeholder="admin@pradsa.com" autocomplete="email"/>
+          </div>
+          <div class="form-group">
+            <label for="lp">Contraseña</label>
+            <input id="lp" name="password" type="password" required placeholder="••••••" autocomplete="current-password"/>
+          </div>
+          <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center" id="login-btn">
+            Iniciar sesión
+          </button>
+        </form>
+      </div>
+    </div>`;
+
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    const errEl = document.getElementById('login-err');
+    const fd = new FormData(e.target);
+    btn.disabled = true; btn.textContent = 'Iniciando…'; errEl.innerHTML = '';
     try {
-      exportNotesAsDocx(notesData, { markAsExported: true });
-      updateStatus('Se descargó el documento con tus respuestas.');
-    } catch (error) {
-      console.error('No se pudo generar el documento .docx', error);
-      updateStatus('No se pudo generar el documento .docx.');
-    }
-  });
-
-  downloadTextBtn?.addEventListener('click', () => {
-    const notesData = collectInterviewNotes();
-    if (!hasInterviewContent(notesData)) {
-      updateStatus('Completa alguna respuesta para poder descargarla.');
-      return;
-    }
-    try {
-      exportNotesAsText(notesData);
-      updateStatus('Se descargó el archivo de notas.');
-    } catch (error) {
-      console.error('No se pudo generar la nota en texto plano', error);
-      updateStatus('No se pudo generar la nota en texto plano.');
+      const d = await api('POST', '/auth/login', { email: fd.get('email'), password: fd.get('password') });
+      saveAuth(d.token, d.user);
+      renderShell();
+      navigate('dashboard');
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+      btn.disabled = false; btn.textContent = 'Iniciar sesión';
     }
   });
 }
 
-function collectInterviewNotes() {
-  const answers = INTERVIEW_QUESTIONS.map((question) => {
-    const textarea = questionListEl?.querySelector(`textarea[data-question-id="${question.id}"]`);
-    return {
-      id: question.id,
-      question: question.prompt,
-      answer: textarea ? textarea.value.trim() : '',
-    };
-  });
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
-  return {
-    answers,
-    generalNotes: generalNotesEl ? generalNotesEl.value.trim() : '',
-  };
-}
-
-function hasInterviewContent(notesData) {
-  if (!notesData) return false;
-  const hasAnswers = notesData.answers?.some((entry) => entry.answer.length > 0);
-  return Boolean(hasAnswers || (notesData.generalNotes && notesData.generalNotes.length > 0));
-}
-
-function resetInterviewNotes() {
-  notesExportedAutomatically = false;
-  generalNotesEl && (generalNotesEl.value = '');
-  questionListEl?.querySelectorAll('textarea').forEach((textarea) => {
-    textarea.value = '';
-  });
-}
-
-function exportNotesAsDocx(notesData, { markAsExported = false } = {}) {
-  const blob = buildDocxBlob(notesData);
-  downloadBlob(blob, buildNotesFileName('docx'));
-  if (markAsExported) {
-    notesExportedAutomatically = true;
-  }
-}
-
-function maybeAutoExportNotes() {
-  if (notesExportedAutomatically) {
-    return false;
-  }
-  const notesData = collectInterviewNotes();
-  if (!hasInterviewContent(notesData)) {
-    return false;
-  }
+async function pageDashboard(container) {
+  container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
   try {
-    exportNotesAsDocx(notesData, { markAsExported: true });
-    return true;
-  } catch (error) {
-    console.error('No se pudieron exportar las notas automáticamente', error);
-    return false;
+    const [employees, tasks, locs] = await Promise.all([
+      api('GET', '/employees'),
+      api('GET', '/tasks'),
+      api('GET', '/location/employees').catch(() => []),
+    ]);
+
+    const active   = employees.filter(e => e.active).length;
+    const pending  = tasks.filter(t => t.status === 'pending').length;
+    const inProg   = tasks.filter(t => t.status === 'in_progress').length;
+    const today    = new Date().toDateString();
+    const doneToday = tasks.filter(t => t.status === 'completed' && t.updated_at && new Date(t.updated_at).toDateString() === today).length;
+
+    const recent = [...tasks].sort((a,b) => new Date(b.updated_at)-new Date(a.updated_at)).slice(0,8);
+
+    container.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-card__icon ic-blue">👥</div><div><div class="stat-card__val">${active}</div><div class="stat-card__label">Empleados activos</div></div></div>
+        <div class="stat-card"><div class="stat-card__icon ic-yellow">⏳</div><div><div class="stat-card__val">${pending}</div><div class="stat-card__label">Tareas pendientes</div></div></div>
+        <div class="stat-card"><div class="stat-card__icon ic-blue">🔄</div><div><div class="stat-card__val">${inProg}</div><div class="stat-card__label">En progreso</div></div></div>
+        <div class="stat-card"><div class="stat-card__icon ic-green">✅</div><div><div class="stat-card__val">${doneToday}</div><div class="stat-card__label">Completadas hoy</div></div></div>
+      </div>
+      <div class="dash-grid">
+        <div class="panel">
+          <div class="panel__header">
+            <h2>Tareas recientes</h2>
+            <button class="btn btn--ghost btn--sm" id="dash-go-tasks">Ver todas →</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Título</th><th>Asignado a</th><th>Prioridad</th><th>Estado</th><th>Actualizado</th></tr></thead>
+              <tbody>
+                ${recent.length ? recent.map(t => `
+                  <tr>
+                    <td><strong>${esc(t.title)}</strong></td>
+                    <td class="muted">${esc(t.assigned_to_name || '—')}</td>
+                    <td><span class="badge badge--${t.priority}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
+                    <td><span class="badge badge--${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
+                    <td class="muted">${timeAgo(t.updated_at)}</td>
+                  </tr>`).join('') : '<tr><td colspan="5" class="table-empty">No hay tareas aún</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel__header"><h2>Ubicaciones activas</h2></div>
+          ${locs.length
+            ? locs.map(l => `
+              <div class="loc-item">
+                <div class="avatar avatar--sm">${initials(l.name)}</div>
+                <div class="loc-item__info">
+                  <div class="loc-item__name">${esc(l.name)}</div>
+                  <div class="loc-item__time">${timeAgo(l.updated_at)}</div>
+                </div>
+                <div class="online-dot"></div>
+              </div>`).join('')
+            : '<p class="muted" style="padding:1rem;font-size:.8125rem">Sin ubicaciones disponibles</p>'}
+        </div>
+      </div>`;
+
+    document.getElementById('dash-go-tasks').addEventListener('click', () => navigate('tasks'));
+  } catch (err) {
+    container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
   }
 }
 
-function exportNotesAsText(notesData) {
-  const lines = [];
-  const timestamp = new Date();
-  lines.push(`Notas de la entrevista (${timestamp.toLocaleString()})`);
-  lines.push('');
-  const answers = Array.isArray(notesData.answers) ? notesData.answers : [];
-  answers.forEach((entry, index) => {
-    lines.push(`${index + 1}. ${entry.question}`);
-    lines.push(entry.answer ? entry.answer : 'Sin respuesta.');
-    lines.push('');
-  });
-  if (notesData.generalNotes) {
-    lines.push('Notas adicionales:');
-    lines.push(notesData.generalNotes);
+// ─── Employees ────────────────────────────────────────────────────────────────
+
+async function pageEmployees(container) {
+  container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
+  let employees = [], search = '';
+
+  async function load() {
+    employees = await api('GET', '/employees');
+    render();
   }
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-  downloadBlob(blob, buildNotesFileName('txt'));
-}
 
-function buildNotesFileName(extension) {
-  const iso = new Date().toISOString().replace(/[:.]/g, '-');
-  return `entrevista-${iso}.${extension}`;
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function buildDocxBlob(notesData) {
-  const encoder = new TextEncoder();
-  const generatedAt = new Date();
-  const iso = generatedAt.toISOString();
-  const files = [
-    {
-      name: '[Content_Types].xml',
-      data: encoder.encode(`<?xml version="1.0" encoding="UTF-8"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-</Types>
-`),
-    },
-    {
-      name: '_rels/.rels',
-      data: encoder.encode(`<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="R1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-  <Relationship Id="R2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="R3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>
-`),
-    },
-    {
-      name: 'docProps/app.xml',
-      data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>Homepty Entrevistas</Application>
-  <DocSecurity>0</DocSecurity>
-  <ScaleCrop>false</ScaleCrop>
-  <HeadingPairs>
-    <vt:vector size="2" baseType="variant">
-      <vt:variant>
-        <vt:lpstr>Temas</vt:lpstr>
-      </vt:variant>
-      <vt:variant>
-        <vt:i4>1</vt:i4>
-      </vt:variant>
-    </vt:vector>
-  </HeadingPairs>
-  <TitlesOfParts>
-    <vt:vector size="1" baseType="lpstr">
-      <vt:lpstr>Notas de la entrevista</vt:lpstr>
-    </vt:vector>
-  </TitlesOfParts>
-  <Company>Homepty</Company>
-  <LinksUpToDate>false</LinksUpToDate>
-  <SharedDoc>false</SharedDoc>
-  <HyperlinksChanged>false</HyperlinksChanged>
-  <AppVersion>16.0000</AppVersion>
-</Properties>
-`),
-    },
-    {
-      name: 'docProps/core.xml',
-      data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>Notas de la entrevista</dc:title>
-  <dc:subject>Entrevista</dc:subject>
-  <dc:creator>Homepty Entrevistas</dc:creator>
-  <cp:keywords>entrevista; notas</cp:keywords>
-  <dc:description>Respuestas capturadas durante la sesión</dc:description>
-  <cp:lastModifiedBy>Homepty Entrevistas</cp:lastModifiedBy>
-  <dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created>
-  <dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified>
-</cp:coreProperties>
-`),
-    },
-    {
-      name: 'word/document.xml',
-      data: encoder.encode(buildDocumentXml(notesData, generatedAt)),
-    },
-    {
-      name: 'word/_rels/document.xml.rels',
-      data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>
-`),
-    },
-  ];
-
-  const zipped = createZip(files);
-  return new Blob([zipped], {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  });
-}
-
-function buildDocumentXml(notesData, generatedAt) {
-  const answers = Array.isArray(notesData.answers) ? notesData.answers : [];
-  const paragraphs = [];
-  paragraphs.push(
-    '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr><w:t>Notas de la entrevista</w:t></w:r></w:p>'
-  );
-  paragraphs.push(
-    createParagraph(`Generado el ${generatedAt.toLocaleString('es-ES')}`, { italic: true })
-  );
-  paragraphs.push(createParagraph(''));
-
-  answers.forEach((entry, index) => {
-    paragraphs.push(
-      createParagraph(`${index + 1}. ${entry.question}`, { bold: true })
+  function filtered() {
+    if (!search) return employees;
+    const q = search.toLowerCase();
+    return employees.filter(e =>
+      [e.name, e.email, e.department, e.position].some(v => (v||'').toLowerCase().includes(q))
     );
-    const answerText = entry.answer ? entry.answer : 'Sin respuesta registrada.';
-    paragraphs.push(createParagraph(answerText));
-  });
-
-  if (notesData.generalNotes) {
-    paragraphs.push(createParagraph('Notas adicionales', { bold: true }));
-    paragraphs.push(createParagraph(notesData.generalNotes));
   }
 
-  paragraphs.push('<w:p/>');
+  function render() {
+    const list = filtered();
+    container.innerHTML = `
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Empleados <span class="muted" style="font-weight:400">(${list.length})</span></h2>
+          <div class="panel__toolbar">
+            <input class="search-input" id="emp-search" placeholder="🔍 Buscar..." value="${esc(search)}"/>
+            <button class="btn btn--primary" id="emp-new">+ Nuevo empleado</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Departamento</th><th>Puesto</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+              ${list.length ? list.map(e => `
+                <tr>
+                  <td>
+                    <div class="flex gap-2" style="align-items:center">
+                      <div class="avatar avatar--sm">${initials(e.name)}</div>
+                      <strong>${esc(e.name)}</strong>
+                    </div>
+                  </td>
+                  <td class="muted">${esc(e.email)}</td>
+                  <td class="muted">${esc(e.phone||'—')}</td>
+                  <td>${esc(e.department||'—')}</td>
+                  <td>${esc(e.position||'—')}</td>
+                  <td><span class="badge badge--${e.active?'active':'inactive'}">${e.active?'Activo':'Inactivo'}</span></td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button class="btn btn--ghost btn--sm" data-action="edit" data-id="${e.id}">Editar</button>
+                      <button class="btn btn--${e.active?'danger':'ghost'} btn--sm" data-action="toggle" data-id="${e.id}">
+                        ${e.active?'Desactivar':'Activar'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>`).join('') : `<tr><td colspan="7" class="table-empty">No se encontraron empleados</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
 
-  const body = paragraphs.join('');
-
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    ${body}
-    <w:sectPr>
-      <w:pgSz w:w="12240" w:h="15840"/>
-      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
-      <w:cols w:space="720"/>
-      <w:docGrid w:linePitch="360"/>
-    </w:sectPr>
-  </w:body>
-</w:document>
-`;
-}
-
-function createParagraph(text, { bold = false, italic = false } = {}) {
-  const lines = text.split(/\r?\n/);
-  if (lines.length === 0) lines.push('');
-  const runs = [];
-  lines.forEach((line, index) => {
-    runs.push(createRun(line, { bold, italic }));
-    if (index < lines.length - 1) {
-      runs.push('<w:r><w:br/></w:r>');
-    }
-  });
-  return `<w:p>${runs.join('')}</w:p>`;
-}
-
-function createRun(text, { bold = false, italic = false } = {}) {
-  let runProperties = '';
-  if (bold || italic) {
-    runProperties = '<w:rPr>';
-    if (bold) runProperties += '<w:b/>';
-    if (italic) runProperties += '<w:i/>';
-    runProperties += '</w:rPr>';
+    document.getElementById('emp-search').addEventListener('input', e => {
+      search = e.target.value;
+      const prev = e.target.selectionStart;
+      render();
+      const el = document.getElementById('emp-search');
+      if (el) { el.focus(); el.setSelectionRange(prev, prev); }
+    });
+    document.getElementById('emp-new').addEventListener('click', () => modalEmployee(null, load));
+    container.querySelectorAll('[data-action]').forEach(btn => {
+      const emp = employees.find(e => e.id === +btn.dataset.id);
+      if (btn.dataset.action === 'edit')   btn.addEventListener('click', () => modalEmployee(emp, load));
+      if (btn.dataset.action === 'toggle') btn.addEventListener('click', () => toggleEmployee(emp, load));
+    });
   }
-  const safeText = escapeXml(text || ' ');
-  return `<w:r>${runProperties}<w:t xml:space="preserve">${safeText}</w:t></w:r>`;
+
+  await load();
 }
 
-function escapeXml(value) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
+function modalEmployee(emp, onSave) {
+  const isNew = !emp;
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  o.innerHTML = `
+    <div class="modal">
+      <div class="modal__header">
+        <h3>${isNew ? 'Nuevo empleado' : 'Editar empleado'}</h3>
+        <button class="modal__close">✕</button>
+      </div>
+      <div class="modal__body">
+        <div id="merr"></div>
+        <form id="emp-form">
+          <div class="form-row">
+            <div class="form-group"><label>Nombre *</label><input name="name" required value="${esc(emp?.name||'')}"/></div>
+            <div class="form-group"><label>Email *</label><input name="email" type="email" required value="${esc(emp?.email||'')}"${!isNew?' readonly':''}/></div>
+          </div>
+          ${isNew ? `
+          <div class="form-row">
+            <div class="form-group"><label>Contraseña *</label><input name="password" type="password" required minlength="6" placeholder="Mín. 6 caracteres"/></div>
+            <div class="form-group"><label>Teléfono</label><input name="phone" type="tel"/></div>
+          </div>` : `
+          <div class="form-group"><label>Teléfono</label><input name="phone" type="tel" value="${esc(emp?.phone||'')}"/></div>`}
+          <div class="form-row">
+            <div class="form-group"><label>Departamento</label><input name="department" value="${esc(emp?.department||'')}"/></div>
+            <div class="form-group"><label>Puesto</label><input name="position" value="${esc(emp?.position||'')}"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Código de empleado</label><input name="employee_code" value="${esc(emp?.employee_code||'')}"/></div>
+            <div class="form-group"><label>Fecha de contratación</label><input name="hire_date" type="date" value="${emp?.hire_date?emp.hire_date.slice(0,10):''}"/></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="mcancel">Cancelar</button>
+        <button class="btn btn--primary" id="msave">${isNew?'Crear empleado':'Guardar cambios'}</button>
+      </div>
+    </div>`;
 
-function createZip(files) {
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
+  document.body.appendChild(o);
+  const close = () => o.remove();
+  o.querySelector('.modal__close').addEventListener('click', close);
+  o.querySelector('#mcancel').addEventListener('click', close);
+  o.addEventListener('click', e => { if (e.target === o) close(); });
 
-  files.forEach((file) => {
-    const nameBytes = new TextEncoder().encode(file.name);
-    const dataBytes = file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
-    const crc = crc32(dataBytes);
+  o.querySelector('#msave').addEventListener('click', async () => {
+    const form = o.querySelector('#emp-form');
+    const errEl = o.querySelector('#merr');
+    const btn = o.querySelector('#msave');
+    if (!form.reportValidity()) return;
 
-    const localHeader = new Uint8Array(30 + nameBytes.length);
-    const localView = new DataView(localHeader.buffer);
-    localView.setUint32(0, 0x04034b50, true);
-    localView.setUint16(4, 20, true);
-    localView.setUint16(6, 0, true);
-    localView.setUint16(8, 0, true);
-    localView.setUint16(10, 0, true);
-    localView.setUint16(12, 0, true);
-    localView.setUint32(14, crc >>> 0, true);
-    localView.setUint32(18, dataBytes.length, true);
-    localView.setUint32(22, dataBytes.length, true);
-    localView.setUint16(26, nameBytes.length, true);
-    localView.setUint16(28, 0, true);
-    localHeader.set(nameBytes, 30);
+    const data = Object.fromEntries(new FormData(form));
+    Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
 
-    localParts.push(localHeader, dataBytes);
-
-    const centralHeader = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(centralHeader.buffer);
-    centralView.setUint32(0, 0x02014b50, true);
-    centralView.setUint16(4, 0x0314, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 0, true);
-    centralView.setUint16(10, 0, true);
-    centralView.setUint16(12, 0, true);
-    centralView.setUint16(14, 0, true);
-    centralView.setUint32(16, crc >>> 0, true);
-    centralView.setUint32(20, dataBytes.length, true);
-    centralView.setUint32(24, dataBytes.length, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint16(30, 0, true);
-    centralView.setUint16(32, 0, true);
-    centralView.setUint16(34, 0, true);
-    centralView.setUint16(36, 0, true);
-    centralView.setUint32(38, 0, true);
-    centralView.setUint32(42, offset, true);
-    centralHeader.set(nameBytes, 46);
-    centralParts.push(centralHeader);
-
-    offset += localHeader.length + dataBytes.length;
-  });
-
-  const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
-  const endRecord = new Uint8Array(22);
-  const endView = new DataView(endRecord.buffer);
-  endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(4, 0, true);
-  endView.setUint16(6, 0, true);
-  endView.setUint16(8, files.length, true);
-  endView.setUint16(10, files.length, true);
-  endView.setUint32(12, centralSize, true);
-  endView.setUint32(16, offset, true);
-  endView.setUint16(20, 0, true);
-
-  const totalSize = offset + centralSize + endRecord.length;
-  const output = new Uint8Array(totalSize);
-  let position = 0;
-  localParts.forEach((part) => {
-    output.set(part, position);
-    position += part.length;
-  });
-  centralParts.forEach((part) => {
-    output.set(part, position);
-    position += part.length;
-  });
-  output.set(endRecord, position);
-
-  return output;
-}
-
-function crc32(bytes) {
-  let crc = -1;
-  for (let i = 0; i < bytes.length; i += 1) {
-    const byte = bytes[i];
-    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ byte) & 0xff];
-  }
-  return (crc ^ -1) >>> 0;
-}
-
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i += 1) {
-    let c = i;
-    for (let j = 0; j < 8; j += 1) {
-      if (c & 1) {
-        c = 0xedb88320 ^ (c >>> 1);
+    btn.disabled = true; btn.textContent = 'Guardando…'; errEl.innerHTML = '';
+    try {
+      if (isNew) {
+        await api('POST', '/employees', data);
+        toast('Empleado creado');
       } else {
-        c >>>= 1;
+        await api('PUT', `/employees/${emp.id}`, data);
+        toast('Empleado actualizado');
       }
+      close(); onSave();
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+      btn.disabled = false; btn.textContent = isNew ? 'Crear empleado' : 'Guardar cambios';
     }
-    table[i] = c >>> 0;
-  }
-  return table;
-})();
-
-joinForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const roomId = roomInput.value.trim();
-  if (!roomId) {
-    updateStatus('Introduce un identificador de sala.');
-    return;
-  }
-  try {
-    await startSession(roomId);
-  } catch (error) {
-    console.error(error);
-    updateStatus('No se pudo iniciar la sesión. Verifica los permisos de cámara/micrófono.');
-  }
-});
-
-toggleAudioBtn.addEventListener('click', () => {
-  if (!localStream) return;
-  const audioTrack = localStream.getAudioTracks()[0];
-  if (!audioTrack) return;
-  audioTrack.enabled = !audioTrack.enabled;
-  toggleAudioBtn.textContent = audioTrack.enabled ? 'Silenciar audio' : 'Activar audio';
-});
-
-toggleVideoBtn.addEventListener('click', () => {
-  if (!localStream) return;
-  const videoTrack = localStream.getVideoTracks()[0];
-  if (!videoTrack) return;
-  videoTrack.enabled = !videoTrack.enabled;
-  toggleVideoBtn.textContent = videoTrack.enabled ? 'Pausar video' : 'Activar video';
-});
-
-shareScreenBtn.addEventListener('click', async () => {
-  if (!peerConnection) return;
-  if (screenStream) {
-    stopScreenShare();
-    return;
-  }
-  try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-    const screenTrack = screenStream.getVideoTracks()[0];
-    const sender = peerConnection.getSenders().find((s) => s.track?.kind === 'video');
-    if (sender && screenTrack) {
-      await sender.replaceTrack(screenTrack);
-      remoteLabel.textContent = 'Compartiendo pantalla';
-      shareScreenBtn.textContent = 'Detener pantalla';
-      screenTrack.onended = () => stopScreenShare();
-    }
-  } catch (error) {
-    console.error('Error compartiendo pantalla', error);
-    updateStatus('No se pudo compartir la pantalla.');
-  }
-});
-
-leaveBtn.addEventListener('click', () => {
-  endSession();
-});
-
-window.addEventListener('beforeunload', () => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'leave' }));
-  }
-});
-
-async function startSession(roomId) {
-  if (ws) {
-    ws.close();
-  }
-
-  resetInterviewNotes();
-
-  clientId = null;
-  remoteLocation = null;
-  lastLocationSent = null;
-  lastLocationSentAt = 0;
-
-  stopLocationWatch();
-
-  if (hasGeolocationSupport) {
-    updateLocalLocationDisplay(null, 'Solicitando permisos de geolocalización…');
-    lastGeolocationErrorMessage = 'Solicitando permisos de geolocalización…';
-  } else {
-    updateLocalLocationDisplay(null, 'Tu navegador no soporta geolocalización.');
-    lastGeolocationErrorMessage = 'Tu navegador no soporta geolocalización.';
-  }
-  updateRemoteLocationDisplay(null, 'Esperando a la otra persona…');
-  updateDistanceInfo('A la espera de ambas ubicaciones.');
-
-  localLocation = null;
-  if (hasGeolocationSupport) {
-    try {
-      const position = await requestCurrentLocation();
-      localLocation = position;
-      updateLocalLocationDisplay(localLocation);
-      lastGeolocationErrorMessage = null;
-    } catch (error) {
-      console.warn('No se pudo obtener la ubicación inicial', error);
-      lastGeolocationErrorMessage = describeGeolocationError(error);
-      updateLocalLocationDisplay(null, lastGeolocationErrorMessage);
-    }
-    startLocationWatch();
-  }
-
-  const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  localStream = media;
-  localVideo.srcObject = localStream;
-
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${protocol}://${window.location.host}/signal`);
-
-  ws.onopen = () => {
-    const joinPayload = { type: 'join', roomId };
-    if (localLocation) {
-      joinPayload.location = localLocation;
-    }
-    ws.send(JSON.stringify(joinPayload));
-    updateStatus('Esperando a la otra persona…');
-    sessionSection.hidden = true;
-    callSection.hidden = false;
-    startTimer();
-    sendLocationUpdate(true);
-  };
-
-  ws.onmessage = async (event) => {
-    const data = safeParse(event.data);
-    if (!data) return;
-    switch (data.type) {
-      case 'joined':
-        clientId = data.clientId || null;
-        break;
-      case 'location_ack':
-        localLocation = data.location || null;
-        if (localLocation) {
-          updateLocalLocationDisplay(localLocation);
-          lastGeolocationErrorMessage = null;
-        } else {
-          updateLocalLocationDisplay(null, lastGeolocationErrorMessage || 'Ubicación no disponible.');
-        }
-        updateDistanceInfo();
-        break;
-      case 'location_update': {
-        const senderId = data.from || data.peerId || null;
-        if (!senderId || senderId !== clientId) {
-          remoteLocation = data.location || null;
-          if (remoteLocation) {
-            updateRemoteLocationDisplay(remoteLocation);
-          } else {
-            updateRemoteLocationDisplay(null, 'Ubicación no disponible.');
-          }
-          updateDistanceInfo();
-        }
-        break;
-      }
-      case 'ready':
-        isInitiator = Boolean(data.initiator);
-        await ensurePeerConnection();
-        if (isInitiator) {
-          await createOffer();
-        }
-        break;
-      case 'offer':
-        await ensurePeerConnection();
-        if (data.sdp) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
-          await createAnswer();
-        }
-        break;
-      case 'answer':
-        if (data.sdp && peerConnection) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
-        }
-        break;
-      case 'ice':
-        if (data.candidate && peerConnection) {
-          try {
-            await peerConnection.addIceCandidate(data.candidate);
-          } catch (err) {
-            console.error('Error al añadir candidato ICE', err);
-          }
-        }
-        break;
-      case 'peer_left':
-        updateStatus('La otra persona abandonó la sala.');
-        resetRemoteMedia();
-        break;
-      case 'room_full':
-        endSession('La sala ya tiene dos participantes.');
-        break;
-      case 'error':
-        updateStatus(data.message || 'Ocurrió un error inesperado.');
-        break;
-      default:
-        break;
-    }
-  };
-
-  ws.onerror = () => {
-    updateStatus('Error en la conexión de señalización.');
-  };
-
-  ws.onclose = () => {
-    endSession('Conexión cerrada.');
-  };
-}
-
-async function ensurePeerConnection() {
-  if (peerConnection) {
-    return peerConnection;
-  }
-  peerConnection = new RTCPeerConnection({ iceServers });
-  peerConnection.onicecandidate = ({ candidate }) => {
-    if (candidate && ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'ice', candidate }));
-    }
-  };
-  peerConnection.ontrack = ({ streams }) => {
-    if (streams && streams[0]) {
-      remoteVideo.srcObject = streams[0];
-      remoteLabel.textContent = 'Invitado conectado';
-    }
-  };
-  peerConnection.onconnectionstatechange = () => {
-    const state = peerConnection.connectionState;
-    if (state === 'connected') {
-      updateStatus('Entrevista en curso.');
-      startQualityMonitor();
-    } else if (state === 'disconnected' || state === 'failed') {
-      updateStatus('Conexión inestable, intentando recuperar…');
-    }
-  };
-
-  localStream.getTracks().forEach((track) => {
-    peerConnection.addTrack(track, localStream);
   });
-
-  return peerConnection;
 }
 
-async function createOffer() {
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-  ws?.send(JSON.stringify({ type: 'offer', sdp: offer.sdp }));
-}
-
-async function createAnswer() {
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-  ws?.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
-}
-
-function updateStatus(message) {
-  statusEl.textContent = message ?? '';
-}
-
-function safeParse(payload) {
+async function toggleEmployee(emp, onDone) {
+  const action = emp.active ? 'desactivar' : 'activar';
+  if (!confirm(`¿${action.charAt(0).toUpperCase()+action.slice(1)} a ${emp.name}?`)) return;
   try {
-    return JSON.parse(payload);
-  } catch (error) {
-    return null;
-  }
+    if (emp.active) await api('DELETE', `/employees/${emp.id}`);
+    else            await api('PUT', `/employees/${emp.id}`, { active: 1 });
+    toast(`Empleado ${emp.active ? 'desactivado' : 'activado'}`);
+    onDone();
+  } catch (err) { toast(err.message, 'error'); }
 }
 
-function resetRemoteMedia() {
-  remoteVideo.srcObject = null;
-  remoteLabel.textContent = 'Invitado';
-  remoteLocation = null;
-  updateRemoteLocationDisplay(null, 'Esperando a la otra persona…');
-  updateDistanceInfo(localLocation ? 'A la espera de la ubicación de la otra persona.' : 'A la espera de ambas ubicaciones.');
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
-  }
-  stopQualityMonitor();
-}
+// ─── Tasks ────────────────────────────────────────────────────────────────────
 
-function stopScreenShare() {
-  if (!screenStream) return;
-  const screenTrack = screenStream.getTracks()[0];
-  screenTrack?.stop();
-  const cameraTrack = localStream?.getVideoTracks()[0];
-  const sender = peerConnection?.getSenders().find((s) => s.track?.kind === 'video');
-  if (sender && cameraTrack) {
-    sender.replaceTrack(cameraTrack);
-  }
-  screenStream = null;
-  shareScreenBtn.textContent = 'Compartir pantalla';
-  remoteLabel.textContent = remoteVideo.srcObject ? 'Invitado conectado' : 'Invitado';
-}
+async function pageTasks(container) {
+  container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
+  let tasks = [], employees = [], fStatus = 'all', fPriority = 'all';
 
-function endSession(message = 'Sesión finalizada.') {
-  const exportedNotes = maybeAutoExportNotes();
-  stopTimer();
-  stopQualityMonitor();
-  stopLocationWatch();
-  remoteLocation = null;
-  updateRemoteLocationDisplay(null, 'Esperando a la otra persona…');
-  updateDistanceInfo(localLocation ? 'A la espera de la ubicación de la otra persona.' : 'A la espera de ambas ubicaciones.');
-
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'leave' }));
-    ws.close();
-  }
-  ws = null;
-
-  if (peerConnection) {
-    peerConnection.ontrack = null;
-    peerConnection.onicecandidate = null;
-    peerConnection.onconnectionstatechange = null;
-    peerConnection.close();
-    peerConnection = null;
+  async function load() {
+    [tasks, employees] = await Promise.all([api('GET', '/tasks'), api('GET', '/employees')]);
+    render();
   }
 
-  stopScreenShare();
-
-  localStream?.getTracks().forEach((track) => track.stop());
-  localStream = null;
-
-  remoteVideo.srcObject = null;
-  localVideo.srcObject = null;
-
-  callSection.hidden = true;
-  sessionSection.hidden = false;
-  isInitiator = false;
-  updateStatus(exportedNotes ? `${message} Tus respuestas se guardaron en un documento.` : message);
-}
-
-function startTimer() {
-  callStart = Date.now();
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    const elapsed = Date.now() - callStart;
-    const minutes = Math.floor(elapsed / 60000);
-    const seconds = Math.floor((elapsed % 60000) / 1000);
-    timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }, 1000);
-}
-
-function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
+  function filtered() {
+    return tasks.filter(t =>
+      (fStatus   === 'all' || t.status   === fStatus) &&
+      (fPriority === 'all' || t.priority === fPriority)
+    );
   }
-  timerEl.textContent = '00:00';
+
+  function render() {
+    const list = filtered();
+    container.innerHTML = `
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Tareas <span class="muted" style="font-weight:400">(${list.length})</span></h2>
+          <div class="panel__toolbar">
+            <select class="filter-select" id="tf-status">
+              <option value="all">Todos los estados</option>
+              <option value="pending"     ${fStatus==='pending'    ?'selected':''}>Pendiente</option>
+              <option value="in_progress" ${fStatus==='in_progress'?'selected':''}>En progreso</option>
+              <option value="completed"   ${fStatus==='completed'  ?'selected':''}>Completada</option>
+              <option value="cancelled"   ${fStatus==='cancelled'  ?'selected':''}>Cancelada</option>
+            </select>
+            <select class="filter-select" id="tf-priority">
+              <option value="all">Todas las prioridades</option>
+              <option value="urgent" ${fPriority==='urgent'?'selected':''}>Urgente</option>
+              <option value="high"   ${fPriority==='high'  ?'selected':''}>Alta</option>
+              <option value="medium" ${fPriority==='medium'?'selected':''}>Media</option>
+              <option value="low"    ${fPriority==='low'   ?'selected':''}>Baja</option>
+            </select>
+            <button class="btn btn--primary" id="task-new">+ Nueva tarea</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Título</th><th>Asignado a</th><th>Prioridad</th><th>Estado</th><th>Fecha límite</th><th>Ubicación</th><th>Acciones</th></tr></thead>
+            <tbody>
+              ${list.length ? list.map(t => `
+                <tr>
+                  <td>
+                    <strong>${esc(t.title)}</strong>
+                    ${t.description?`<div class="muted" style="font-size:.8125rem;margin-top:.1rem">${esc(t.description.slice(0,55))}${t.description.length>55?'…':''}</div>`:''}
+                  </td>
+                  <td class="muted">${esc(t.assigned_to_name||'—')}</td>
+                  <td><span class="badge badge--${t.priority}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
+                  <td><span class="badge badge--${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
+                  <td class="muted">${formatDate(t.due_date)}</td>
+                  <td class="muted">${esc(t.location_name||'—')}</td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button class="btn btn--ghost btn--sm" data-action="edit" data-id="${t.id}">Editar</button>
+                      <button class="btn btn--danger btn--sm" data-action="del" data-id="${t.id}">Eliminar</button>
+                    </div>
+                  </td>
+                </tr>`).join('') : `<tr><td colspan="7" class="table-empty">No hay tareas</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    document.getElementById('tf-status').addEventListener('change', e => { fStatus = e.target.value; render(); });
+    document.getElementById('tf-priority').addEventListener('change', e => { fPriority = e.target.value; render(); });
+    document.getElementById('task-new').addEventListener('click', () => modalTask(null, employees, load));
+
+    container.querySelectorAll('[data-action]').forEach(btn => {
+      const task = tasks.find(t => t.id === +btn.dataset.id);
+      if (btn.dataset.action === 'edit') btn.addEventListener('click', () => modalTask(task, employees, load));
+      if (btn.dataset.action === 'del')  btn.addEventListener('click', () => deleteTask(task, load));
+    });
+  }
+
+  await load();
 }
 
-function startQualityMonitor() {
-  stopQualityMonitor();
-  if (!peerConnection) return;
-  lastVideoStats = null;
-  qualityInterval = setInterval(async () => {
-    if (!peerConnection) return;
+function modalTask(task, employees, onSave) {
+  const isNew = !task;
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  o.innerHTML = `
+    <div class="modal">
+      <div class="modal__header">
+        <h3>${isNew ? 'Nueva tarea' : 'Editar tarea'}</h3>
+        <button class="modal__close">✕</button>
+      </div>
+      <div class="modal__body">
+        <div id="merr"></div>
+        <form id="task-form">
+          <div class="form-group"><label>Título *</label><input name="title" required value="${esc(task?.title||'')}"/></div>
+          <div class="form-group"><label>Descripción</label><textarea name="description">${esc(task?.description||'')}</textarea></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Asignado a</label>
+              <select name="assigned_to">
+                <option value="">Sin asignar</option>
+                ${employees.filter(e=>e.active).map(e=>`<option value="${e.id}"${task?.assigned_to===e.id?' selected':''}>${esc(e.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prioridad</label>
+              <select name="priority">
+                <option value="low"    ${task?.priority==='low'   ?'selected':''}>Baja</option>
+                <option value="medium" ${!task||task?.priority==='medium'?'selected':''}>Media</option>
+                <option value="high"   ${task?.priority==='high'  ?'selected':''}>Alta</option>
+                <option value="urgent" ${task?.priority==='urgent'?'selected':''}>Urgente</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Estado</label>
+              <select name="status">
+                <option value="pending"     ${!task||task?.status==='pending'    ?'selected':''}>Pendiente</option>
+                <option value="in_progress" ${task?.status==='in_progress'?'selected':''}>En progreso</option>
+                <option value="completed"   ${task?.status==='completed'  ?'selected':''}>Completada</option>
+                <option value="cancelled"   ${task?.status==='cancelled'  ?'selected':''}>Cancelada</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Fecha límite</label>
+              <input name="due_date" type="datetime-local" value="${task?.due_date?task.due_date.slice(0,16):''}"/>
+            </div>
+          </div>
+          <div class="form-group"><label>Nombre de ubicación</label><input name="location_name" value="${esc(task?.location_name||'')}"/></div>
+          <div class="form-row">
+            <div class="form-group"><label>Latitud</label><input name="location_lat" type="number" step="any" value="${task?.location_lat??''}"/></div>
+            <div class="form-group"><label>Longitud</label><input name="location_lng" type="number" step="any" value="${task?.location_lng??''}"/></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="mcancel">Cancelar</button>
+        <button class="btn btn--primary" id="msave">${isNew?'Crear tarea':'Guardar cambios'}</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(o);
+  const close = () => o.remove();
+  o.querySelector('.modal__close').addEventListener('click', close);
+  o.querySelector('#mcancel').addEventListener('click', close);
+  o.addEventListener('click', e => { if (e.target === o) close(); });
+
+  o.querySelector('#msave').addEventListener('click', async () => {
+    const form = o.querySelector('#task-form');
+    const errEl = o.querySelector('#merr');
+    const btn = o.querySelector('#msave');
+    if (!form.reportValidity()) return;
+
+    const data = Object.fromEntries(new FormData(form));
+    if (data.assigned_to) data.assigned_to = parseInt(data.assigned_to, 10);
+    if (data.location_lat !== '') data.location_lat = parseFloat(data.location_lat);
+    if (data.location_lng !== '') data.location_lng = parseFloat(data.location_lng);
+    // Strip empty strings
+    Object.keys(data).forEach(k => { if (data[k] === '' || (typeof data[k] === 'number' && isNaN(data[k]))) delete data[k]; });
+
+    btn.disabled = true; btn.textContent = 'Guardando…'; errEl.innerHTML = '';
     try {
-      const stats = await peerConnection.getStats();
-      stats.forEach((report) => {
-        if (report.type === 'outbound-rtp' && report.kind === 'video' && !report.isRemote) {
-          let bitrateInfo = 'calculando…';
-          if (lastVideoStats && report.timestamp > lastVideoStats.timestamp) {
-            const bytesDiff = report.bytesSent - lastVideoStats.bytesSent;
-            const timeDiff = report.timestamp - lastVideoStats.timestamp;
-            const bitrate = timeDiff > 0 ? (bytesDiff * 8) / (timeDiff / 1000) : 0;
-            const kbps = bitrate / 1000;
-            bitrateInfo = `${Math.max(0, kbps).toFixed(0)} kbps`;
-          }
-          lastVideoStats = { bytesSent: report.bytesSent, timestamp: report.timestamp };
-          const fps = report.framesPerSecond ?? '–';
-          const loss = report.packetsLost ?? 0;
-          qualityEl.textContent = `Bitrate: ${bitrateInfo} · FPS: ${fps} · Paquetes perdidos: ${loss}`;
+      if (isNew) {
+        await api('POST', '/tasks', data);
+        toast('Tarea creada');
+      } else {
+        await api('PUT', `/tasks/${task.id}`, data);
+        toast('Tarea actualizada');
+      }
+      close(); onSave();
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+      btn.disabled = false; btn.textContent = isNew ? 'Crear tarea' : 'Guardar cambios';
+    }
+  });
+}
+
+async function deleteTask(task, onDone) {
+  if (!confirm(`¿Eliminar la tarea "${task.title}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    await api('DELETE', `/tasks/${task.id}`);
+    toast('Tarea eliminada');
+    onDone();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ─── Map ──────────────────────────────────────────────────────────────────────
+
+async function pageMap(container) {
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel__header">
+        <h2>Ubicación en tiempo real</h2>
+        <span class="muted" id="map-ts">Actualizando…</span>
+      </div>
+      <div id="map"></div>
+    </div>`;
+
+  await new Promise(r => setTimeout(r, 60));
+
+  const L = window.L;
+  if (!L) {
+    container.innerHTML = '<div class="alert alert--error">Leaflet no disponible. Verifica tu conexión a internet.</div>';
+    return;
+  }
+
+  S.map = L.map('map').setView([23.6345, -102.5528], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(S.map);
+
+  async function refresh() {
+    if (!S.map) return;
+    try {
+      const locs = await api('GET', '/location/employees');
+      const ts = document.getElementById('map-ts');
+      if (ts) ts.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-MX')}`;
+
+      const seen = new Set();
+      locs.forEach(loc => {
+        const key = String(loc.employee_id);
+        seen.add(key);
+        const popup = `
+          <div style="min-width:160px;font-family:system-ui,sans-serif;font-size:13px">
+            <strong>${esc(loc.name)}</strong><br/>
+            <span style="color:#6b7280">${esc(loc.email)}</span>
+            <hr style="margin:.4rem 0;border:none;border-top:1px solid #e5e7eb"/>
+            📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}<br/>
+            🕐 ${timeAgo(loc.updated_at)}
+            ${loc.clock_in  ? `<br/>⏰ Entrada: ${formatTime(loc.clock_in)}` : ''}
+            ${loc.clock_out ? `<br/>⏏ Salida: ${formatTime(loc.clock_out)}` : ''}
+          </div>`;
+
+        if (S.markers[key]) {
+          S.markers[key].setLatLng([loc.lat, loc.lng]).setPopupContent(popup);
+        } else {
+          const icon = L.divIcon({
+            className: '',
+            html: `<div style="background:#2563eb;color:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)">${initials(loc.name)}</div>`,
+            iconSize: [34,34], iconAnchor: [17,17],
+          });
+          S.markers[key] = L.marker([loc.lat, loc.lng], { icon }).bindPopup(popup).addTo(S.map);
         }
       });
-    } catch (error) {
-      console.error('No se pudieron obtener métricas de calidad', error);
-    }
-  }, 3000);
-}
 
-function stopQualityMonitor() {
-  if (qualityInterval) {
-    clearInterval(qualityInterval);
-    qualityInterval = null;
-  }
-  lastVideoStats = null;
-  qualityEl.textContent = '';
-}
+      Object.keys(S.markers).forEach(k => {
+        if (!seen.has(k)) { S.map.removeLayer(S.markers[k]); delete S.markers[k]; }
+      });
 
-function requestCurrentLocation() {
-  return new Promise((resolve, reject) => {
-    if (!hasGeolocationSupport) {
-      reject(new Error('Geolocalización no soportada.'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location = extractLocation(position);
-        if (location) {
-          resolve(location);
-        } else {
-          reject(new Error('Datos de geolocalización inválidos.'));
-        }
-      },
-      (error) => reject(error),
-      GEOLOCATION_OPTIONS,
-    );
-  });
-}
-
-function startLocationWatch() {
-  if (!hasGeolocationSupport) {
-    return;
-  }
-  stopLocationWatch();
-  geolocationWatchId = navigator.geolocation.watchPosition(
-    (position) => {
-      const nextLocation = extractLocation(position);
-      if (!nextLocation) {
-        return;
+      if (Object.keys(S.markers).length > 0) {
+        S.map.fitBounds(L.featureGroup(Object.values(S.markers)).getBounds().pad(.3));
       }
-      localLocation = nextLocation;
-      updateLocalLocationDisplay(localLocation);
-      lastGeolocationErrorMessage = null;
-      updateDistanceInfo();
-      sendLocationUpdate();
-    },
-    (error) => {
-      console.warn('No se pudo actualizar la geolocalización', error);
-      if (!localLocation) {
-        lastGeolocationErrorMessage = describeGeolocationError(error);
-        updateLocalLocationDisplay(null, lastGeolocationErrorMessage);
-      }
-      if (typeof error?.code === 'number' && error.code === error.PERMISSION_DENIED) {
-        stopLocationWatch();
-      }
-    },
-    GEOLOCATION_OPTIONS,
-  );
-}
-
-function stopLocationWatch() {
-  if (geolocationWatchId !== null && hasGeolocationSupport) {
-    navigator.geolocation.clearWatch(geolocationWatchId);
-    geolocationWatchId = null;
-  }
-}
-
-function sendLocationUpdate(force = false) {
-  if (!localLocation || !ws || ws.readyState !== WebSocket.OPEN) {
-    return;
-  }
-
-  const now = Date.now();
-  if (!force && lastLocationSent) {
-    const distance = haversineDistanceKm(localLocation, lastLocationSent);
-    const recentlySent = now - lastLocationSentAt < 10000;
-    if (distance < 0.05 && recentlySent) {
-      return;
+    } catch (err) {
+      console.warn('Map refresh error:', err.message);
     }
   }
 
-  ws.send(JSON.stringify({ type: 'location_update', location: localLocation }));
-  lastLocationSent = { ...localLocation };
-  lastLocationSentAt = now;
+  await refresh();
+  S.mapInterval = setInterval(refresh, 30000);
 }
 
-function updateLocalLocationDisplay(location, message) {
-  if (!localLocationEl) return;
-  if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-    localLocationEl.innerHTML = renderLocationDetails(location);
-  } else {
-    localLocationEl.innerHTML = `<p class="location__info">${message || 'Ubicación no disponible.'}</p>`;
+// ─── Attendance ───────────────────────────────────────────────────────────────
+
+async function pageAttendance(container) {
+  container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
+
+  // Default to today
+  const todayStr = new Date().toISOString().slice(0,10);
+  let selectedDate = todayStr;
+
+  async function load(date) {
+    const [records, employees] = await Promise.all([
+      api('GET', `/attendance?date=${date}`),
+      api('GET', '/employees'),
+    ]);
+    render(date, records, employees);
+  }
+
+  function render(date, records, employees) {
+    // Build lookup by employee_id
+    const byEmp = {};
+    records.forEach(r => { byEmp[r.employee_id] = r; });
+
+    const active = employees.filter(e => e.active);
+
+    container.innerHTML = `
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Asistencia</h2>
+          <div class="panel__toolbar">
+            <input type="date" class="filter-select" id="att-date" value="${date}" max="${todayStr}"/>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Empleado</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas trabajadas</th><th>Entrada (coordenadas)</th></tr></thead>
+            <tbody>
+              ${active.length ? active.map(emp => {
+                const r = byEmp[emp.id];
+                const ci = r?.clock_in  ? formatTime(r.clock_in)  : null;
+                const co = r?.clock_out ? formatTime(r.clock_out) : null;
+                return `
+                  <tr>
+                    <td>
+                      <div class="flex gap-2" style="align-items:center">
+                        <div class="avatar avatar--sm">${initials(emp.name)}</div>
+                        <div>
+                          <strong>${esc(emp.name)}</strong>
+                          <div class="muted" style="font-size:.75rem">${esc(emp.position||'')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="muted">${esc(emp.department||'—')}</td>
+                    <td>${ci ? `<span style="color:#16a34a;font-weight:500">${ci}</span>` : '<span class="muted">—</span>'}</td>
+                    <td>${co ? `<span style="color:#dc2626;font-weight:500">${co}</span>` : '<span class="muted">—</span>'}</td>
+                    <td>${calcHours(r?.clock_in, r?.clock_out)}</td>
+                    <td class="muted" style="font-size:.8125rem">${r?.clock_in_lat!=null ? `${r.clock_in_lat.toFixed(4)}, ${r.clock_in_lng.toFixed(4)}` : '—'}</td>
+                  </tr>`;
+              }).join('') : `<tr><td colspan="6" class="table-empty">No hay empleados activos</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    document.getElementById('att-date').addEventListener('change', async e => {
+      selectedDate = e.target.value;
+      const [rec, emp] = await Promise.all([
+        api('GET', `/attendance?date=${selectedDate}`),
+        api('GET', '/employees'),
+      ]);
+      render(selectedDate, rec, emp);
+    });
+  }
+
+  try {
+    await load(selectedDate);
+  } catch (err) {
+    container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
   }
 }
 
-function updateRemoteLocationDisplay(location, message) {
-  if (!remoteLocationEl) return;
-  if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-    remoteLocationEl.innerHTML = renderLocationDetails(location);
-  } else {
-    remoteLocationEl.innerHTML = `<p class="location__info">${message || 'Ubicación no disponible.'}</p>`;
-  }
-}
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
-function updateDistanceInfo(message) {
-  if (!distanceEl) return;
-  distanceEl.classList.remove('location__distance--warning');
-  if (message) {
-    distanceEl.textContent = message;
-    return;
-  }
+window.addEventListener('hashchange', () => {
+  if (S.token) navigate(location.hash.slice(1) || 'dashboard');
+});
 
-  if (localLocation && remoteLocation) {
-    const distanceKm = haversineDistanceKm(localLocation, remoteLocation);
-    const sameSpot = distanceKm * 1000 < 100;
-    const readable = formatDistance(distanceKm);
-    if (sameSpot) {
-      distanceEl.textContent = `Los participantes parecen estar en la misma ubicación (${readable}).`;
-      distanceEl.classList.add('location__distance--warning');
-    } else {
-      distanceEl.textContent = `Distancia estimada entre participantes: ${readable}.`;
-    }
-  } else if (!localLocation && !remoteLocation) {
-    distanceEl.textContent = 'A la espera de ambas ubicaciones.';
-  } else if (!localLocation) {
-    distanceEl.textContent = 'A la espera de tu ubicación.';
-  } else {
-    distanceEl.textContent = 'A la espera de la ubicación de la otra persona.';
-  }
-}
-
-function renderLocationDetails(location) {
-  const details = [];
-  details.push(`<p><strong>Coordenadas:</strong> ${formatCoordinate(location.latitude)}, ${formatCoordinate(location.longitude)}</p>`);
-  if (typeof location.accuracy === 'number') {
-    details.push(`<p><strong>Precisión:</strong> ±${Math.round(location.accuracy)} m</p>`);
-  }
-  details.push(`<p><strong>Verificado:</strong> ${formatTimestamp(location.timestamp)}</p>`);
-  details.push(
-    `<p><a href="${buildMapLink(location)}" target="_blank" rel="noopener">Ver en mapa</a></p>`,
-  );
-  return details.join('');
-}
-
-function formatCoordinate(value) {
-  return Number.parseFloat(value).toFixed(5);
-}
-
-function formatTimestamp(value) {
-  const date = value ? new Date(value) : new Date();
-  if (Number.isNaN(date.getTime())) {
-    return 'Desconocido';
-  }
-  return date.toLocaleString();
-}
-
-function buildMapLink(location) {
-  return `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
-}
-
-function describeGeolocationError(error) {
-  if (!error) {
-    return 'Ubicación no disponible.';
-  }
-  const code = typeof error.code === 'number' ? error.code : null;
-  if (code === error.PERMISSION_DENIED) {
-    return 'Permiso de geolocalización denegado. Activa los permisos del navegador para verificar la ubicación.';
-  }
-  if (code === error.POSITION_UNAVAILABLE) {
-    return 'No se pudo determinar la ubicación. Comprueba tu conexión o la señal GPS.';
-  }
-  if (code === error.TIMEOUT) {
-    return 'La solicitud de ubicación tardó demasiado. Intenta de nuevo.';
-  }
-  if (typeof error.message === 'string' && error.message) {
-    return error.message;
-  }
-  return 'Ubicación no disponible.';
-}
-
-function extractLocation(position) {
-  if (!position?.coords) {
-    return null;
-  }
-  const { latitude, longitude, accuracy } = position.coords;
-  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-    return null;
-  }
-  const location = {
-    latitude: Number(latitude),
-    longitude: Number(longitude),
-    timestamp: typeof position.timestamp === 'number' ? position.timestamp : Date.now(),
-  };
-  if (typeof accuracy === 'number' && Number.isFinite(accuracy)) {
-    location.accuracy = accuracy;
-  }
-  return location;
-}
-
-function haversineDistanceKm(a, b) {
-  const earthRadiusKm = 6371;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLon = toRad(b.longitude - a.longitude);
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
-
-  const sinLat = Math.sin(dLat / 2) ** 2;
-  const sinLon = Math.sin(dLon / 2) ** 2;
-  const h = sinLat + sinLon * Math.cos(lat1) * Math.cos(lat2);
-  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-  return earthRadiusKm * c;
-}
-
-function formatDistance(km) {
-  if (!Number.isFinite(km)) {
-    return 'desconocida';
-  }
-  if (km >= 1) {
-    return `${km.toFixed(2)} km`;
-  }
-  return `${Math.round(km * 1000)} m`;
-}
+(function init() {
+  if (!S.token) { renderLogin(); return; }
+  renderShell();
+  navigate(location.hash.slice(1) || 'dashboard');
+})();
