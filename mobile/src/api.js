@@ -70,7 +70,7 @@ export const authApi = {
 
 export const attendanceApi = {
   getToday: () =>
-    api.get('/attendance/me'),
+    api.get('/attendance/today'),
 
   clockIn: (lat, lng) =>
     api.post('/attendance/clock-in', { lat, lng }),
