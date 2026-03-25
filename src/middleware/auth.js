@@ -8,11 +8,16 @@ const JWT_EXPIRES_IN = '8h';
 
 function auth(req, res, next) {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
+  // Also accept token via ?_token= query param (for image src URLs)
+  const rawToken = (header && header.startsWith('Bearer '))
+    ? header.slice(7)
+    : req.query._token || null;
+
+  if (!rawToken) {
     return res.status(401).json({ error: 'Token de autenticación requerido' });
   }
 
-  const token = header.slice(7);
+  const token = rawToken;
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = db

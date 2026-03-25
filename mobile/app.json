@@ -34,13 +34,23 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pradsa necesita acceso a tu galería para subir fotos.",
+          "cameraPermission": "Pradsa necesita acceso a tu cámara para tomar fotos."
+        }
+      ],
       [
         "expo-location",
         {

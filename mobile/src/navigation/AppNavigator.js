@@ -8,6 +8,7 @@ import HomeScreen from '../screens/HomeScreen';
 import TasksScreen from '../screens/TasksScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import PhotosScreen from '../screens/PhotosScreen';
 
 const Tab = createBottomTabNavigator();
 const TasksStack = createStackNavigator();
@@ -93,6 +94,18 @@ export default function AppNavigator({ user, onLogout }) {
           }}
         >
           {(props) => <TasksStackNavigator {...props} user={user} onLogout={onLogout} />}
+        </Tab.Screen>
+
+        <Tab.Screen
+          name="Photos"
+          options={{
+            title: 'Fotos',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon symbol="📷" focused={focused} color={color} />
+            ),
+          }}
+        >
+          {(props) => <PhotosScreen {...props} user={user} />}
         </Tab.Screen>
 
         <Tab.Screen

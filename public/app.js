@@ -87,8 +87,8 @@ const STATUS_LABEL   = { pending:'Pendiente', in_progress:'En progreso', complet
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-const PAGES = { dashboard: pageDashboard, employees: pageEmployees, tasks: pageTasks, map: pageMap, attendance: pageAttendance };
-const PAGE_TITLES = { dashboard:'Dashboard', employees:'Empleados', tasks:'Tareas', map:'Mapa de empleados', attendance:'Asistencia' };
+const PAGES = { dashboard: pageDashboard, employees: pageEmployees, tasks: pageTasks, map: pageMap, attendance: pageAttendance, photos: pagePhotos };
+const PAGE_TITLES = { dashboard:'Dashboard', employees:'Empleados', tasks:'Tareas', map:'Mapa de empleados', attendance:'Asistencia', photos:'Fotos' };
 
 function navigate(page) {
   if (!S.token) { renderLogin(); return; }
@@ -130,6 +130,7 @@ function renderShell() {
           <li><a href="#" data-page="tasks"><span class="nav-icon">☑</span>Tareas</a></li>
           <li><a href="#" data-page="map"><span class="nav-icon">📍</span>Mapa</a></li>
           <li><a href="#" data-page="attendance"><span class="nav-icon">📅</span>Asistencia</a></li>
+          <li><a href="#" data-page="photos"><span class="nav-icon">📷</span>Fotos</a></li>
         </ul>
         <div class="sidebar__footer">
           <div class="sidebar__user">
@@ -905,6 +906,138 @@ async function pageAttendance(container) {
 
   try {
     await load();
+  } catch (err) {
+    container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+  }
+}
+
+// ─── Photos ───────────────────────────────────────────────────────────────────
+
+async function pagePhotos(container) {
+  container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
+
+  let employees = [];
+  let selectedEmp = '';
+  let photos = [];
+
+  async function load() {
+    const url = selectedEmp ? `/photos?employee_id=${selectedEmp}` : '/photos';
+    [photos, employees] = await Promise.all([
+      api('GET', url),
+      employees.length ? Promise.resolve(employees) : api('GET', '/employees'),
+    ]);
+    render();
+  }
+
+  function render() {
+    container.innerHTML = `
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Fotos de empleados</h2>
+          <div class="panel__toolbar" style="gap:.5rem;align-items:center">
+            <select id="photo-emp-filter" class="filter-select">
+              <option value="">Todos los empleados</option>
+              ${employees.filter(e=>e.active).map(e=>`<option value="${e.id}" ${String(e.id)===String(selectedEmp)?'selected':''}>${esc(e.name)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        ${photos.length === 0 ? `
+          <div class="table-empty" style="padding:3rem;text-align:center;color:#9ca3af">
+            <div style="font-size:3rem;margin-bottom:.75rem">📷</div>
+            No hay fotos registradas
+          </div>` : `
+          <div id="photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;padding:1.25rem">
+            ${photos.map(p => `
+              <div class="photo-card" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08)">
+                <div style="position:relative;padding-top:75%;background:#f1f5f9;cursor:pointer" data-photo-id="${p.id}">
+                  <img src="/api/photos/${p.id}/file"
+                       loading="lazy"
+                       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"
+                       onerror="this.parentElement.innerHTML='<div style=\\'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:2rem\\'>📷</div>'"
+                  />
+                </div>
+                <div style="padding:.75rem">
+                  <div style="font-size:.8125rem;font-weight:600;color:#1e293b;margin-bottom:.2rem">${esc(p.employee_name || '')}</div>
+                  ${p.caption ? `<div style="font-size:.75rem;color:#64748b;margin-bottom:.4rem">${esc(p.caption)}</div>` : ''}
+                  <div style="font-size:.7rem;color:#94a3b8;margin-bottom:.6rem">${formatDate(p.created_at)}</div>
+                  <div style="display:flex;gap:.5rem">
+                    <a href="/api/photos/${p.id}/download?token=${encodeURIComponent(S.token)}" download
+                       style="flex:1;text-align:center;background:#2563eb;color:#fff;border-radius:6px;padding:.35rem .5rem;font-size:.75rem;font-weight:600;text-decoration:none">
+                      ⬇ Descargar
+                    </a>
+                    <button class="btn btn--sm btn--danger" data-del="${p.id}"
+                      style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:.35rem .6rem;font-size:.75rem;cursor:pointer;font-weight:600">
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              </div>`).join('')}
+          </div>`}
+      </div>`;
+
+    document.getElementById('photo-emp-filter').addEventListener('change', async e => {
+      selectedEmp = e.target.value;
+      const url = selectedEmp ? `/photos?employee_id=${selectedEmp}` : '/photos';
+      photos = await api('GET', url);
+      render();
+    });
+
+    // Preview on image click
+    container.querySelectorAll('[data-photo-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.photoId;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out';
+        overlay.innerHTML = `<img src="/api/photos/${id}/file" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.5)">`;
+        overlay.addEventListener('click', () => overlay.remove());
+        document.body.appendChild(overlay);
+      });
+    });
+
+    // Delete buttons
+    container.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar esta foto?')) return;
+        try {
+          await api('DELETE', `/photos/${btn.dataset.del}`);
+          photos = photos.filter(p => String(p.id) !== String(btn.dataset.del));
+          render();
+          toast('Foto eliminada');
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+    });
+  }
+
+  // Download needs auth header — use token in query param via a signed approach
+  // We'll patch the download links after render to use fetch+blob instead
+  function patchDownloadLinks() {
+    container.querySelectorAll('a[download]').forEach(a => {
+      a.addEventListener('click', async e => {
+        e.preventDefault();
+        try {
+          const res = await fetch(a.href.replace(`?token=${encodeURIComponent(S.token)}`, ''), {
+            headers: { Authorization: `Bearer ${S.token}` },
+          });
+          if (!res.ok) throw new Error('Error al descargar');
+          const blob = await res.blob();
+          const url  = URL.createObjectURL(blob);
+          const tmp  = document.createElement('a');
+          tmp.href = url; tmp.download = a.getAttribute('download') || 'foto.jpg';
+          tmp.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+    });
+  }
+
+  try {
+    await load();
+    patchDownloadLinks();
   } catch (err) {
     container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
   }
