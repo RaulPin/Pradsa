@@ -28,7 +28,12 @@ app.get('/api/health', (_req, res) =>
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
-// Serve SPA for all non-API routes
+// Employee mobile PWA
+app.get('/employee', (_req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'employee.html'))
+);
+
+// Serve admin SPA for all other non-API routes
 app.get('*', (_req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
 );

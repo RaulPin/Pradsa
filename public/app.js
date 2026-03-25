@@ -197,6 +197,11 @@ function renderLogin() {
     try {
       const d = await api('POST', '/auth/login', { email: fd.get('email'), password: fd.get('password') });
       saveAuth(d.token, d.user);
+      // Redirect employees to their mobile app
+      if (d.user.role !== 'admin') {
+        window.location.href = '/employee';
+        return;
+      }
       renderShell();
       navigate('dashboard');
     } catch (err) {
@@ -790,6 +795,11 @@ window.addEventListener('hashchange', () => {
 
 (function init() {
   if (!S.token) { renderLogin(); return; }
+  // Non-admins belong in the employee app
+  if (S.user?.role !== 'admin') {
+    window.location.href = '/employee';
+    return;
+  }
   renderShell();
   navigate(location.hash.slice(1) || 'dashboard');
 })();
