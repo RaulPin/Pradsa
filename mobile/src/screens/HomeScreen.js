@@ -16,8 +16,10 @@ const PRIMARY = '#2563eb';
 
 function formatTime(isoString) {
   if (!isoString) return '--:--';
-  const d = new Date(isoString);
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  // SQLite returns timestamps without timezone suffix — treat as UTC
+  const normalized = isoString.replace(' ', 'T').replace(/Z?$/, 'Z');
+  const d = new Date(normalized);
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDate(date) {
