@@ -21,6 +21,7 @@ app.use('/api/employees',  require('./src/routes/employees'));
 app.use('/api/tasks',      require('./src/routes/tasks'));
 app.use('/api/attendance', require('./src/routes/attendance'));
 app.use('/api/location',   require('./src/routes/location'));
+app.use('/api/reports',    require('./src/routes/reports'));
 
 app.get('/api/health', (_req, res) =>
   res.json({ status: 'ok', timestamp: new Date().toISOString() })

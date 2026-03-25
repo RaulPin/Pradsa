@@ -86,6 +86,18 @@ db.exec(`
     accuracy     REAL,
     updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS location_history (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lat          REAL    NOT NULL,
+    lng          REAL    NOT NULL,
+    accuracy     REAL,
+    recorded_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_loc_history_emp_date
+    ON location_history(employee_id, recorded_at);
 `);
 
 // Seed default admin user if none exists

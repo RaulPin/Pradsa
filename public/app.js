@@ -634,11 +634,24 @@ async function deleteTask(task, onDone) {
 // ─── Map ──────────────────────────────────────────────────────────────────────
 
 async function pageMap(container) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   container.innerHTML = `
     <div class="panel">
       <div class="panel__header">
         <h2>Ubicación en tiempo real</h2>
-        <span class="muted" id="map-ts">Actualizando…</span>
+        <div class="panel__toolbar" style="align-items:center;gap:.5rem">
+          <select id="map-mode" class="filter-select">
+            <option value="live">Tiempo real</option>
+            <option value="history">Historial de ruta</option>
+          </select>
+          <div id="history-controls" style="display:none;align-items:center;gap:.5rem">
+            <select id="hist-emp" class="filter-select"><option value="">— Empleado —</option></select>
+            <input type="date" id="hist-date" class="filter-select" value="${todayStr}" max="${todayStr}"/>
+            <button class="btn btn--sm" id="hist-load">Ver ruta</button>
+          </div>
+          <span class="muted" id="map-ts">Actualizando…</span>
+        </div>
       </div>
       <div id="map"></div>
     </div>`;
@@ -657,6 +670,9 @@ async function pageMap(container) {
     maxZoom: 19,
   }).addTo(S.map);
 
+  let routeLayer = null;
+
+  // ── Live mode ──
   async function refresh() {
     if (!S.map) return;
     try {
@@ -703,6 +719,83 @@ async function pageMap(container) {
     }
   }
 
+  // ── History mode ──
+  function clearRoute() {
+    if (routeLayer) { S.map.removeLayer(routeLayer); routeLayer = null; }
+    Object.keys(S.markers).forEach(k => { S.map.removeLayer(S.markers[k]); delete S.markers[k]; });
+  }
+
+  async function loadRoute() {
+    const empId = document.getElementById('hist-emp').value;
+    const date  = document.getElementById('hist-date').value;
+    const ts    = document.getElementById('map-ts');
+    if (!empId) { toast('Selecciona un empleado', 'error'); return; }
+
+    clearRoute();
+    if (ts) ts.textContent = 'Cargando ruta…';
+
+    try {
+      const points = await api('GET', `/location/history/${empId}?date=${date}`);
+      if (!points.length) {
+        if (ts) ts.textContent = 'Sin puntos de ruta para esta fecha.';
+        return;
+      }
+
+      const latlngs = points.map(p => [p.lat, p.lng]);
+
+      // Polyline
+      routeLayer = L.polyline(latlngs, { color: '#2563eb', weight: 3, opacity: .7 }).addTo(S.map);
+
+      // Start marker (green)
+      const startIcon = L.divIcon({ className: '', html: `<div style="background:#16a34a;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">▶</div>`, iconSize:[28,28], iconAnchor:[14,14] });
+      S.markers['start'] = L.marker(latlngs[0], { icon: startIcon })
+        .bindPopup(`<b>Inicio</b><br/>${new Date(points[0].recorded_at).toLocaleTimeString('es-MX')}`)
+        .addTo(S.map);
+
+      // End marker (red)
+      const endIcon = L.divIcon({ className: '', html: `<div style="background:#dc2626;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">■</div>`, iconSize:[28,28], iconAnchor:[14,14] });
+      const last = points[points.length - 1];
+      S.markers['end'] = L.marker(latlngs[latlngs.length - 1], { icon: endIcon })
+        .bindPopup(`<b>Último punto</b><br/>${new Date(last.recorded_at).toLocaleTimeString('es-MX')}`)
+        .addTo(S.map);
+
+      S.map.fitBounds(routeLayer.getBounds().pad(.2));
+      if (ts) ts.textContent = `${points.length} puntos · ${date}`;
+    } catch (err) {
+      if (ts) ts.textContent = '';
+      toast('Error cargando ruta: ' + err.message, 'error');
+    }
+  }
+
+  // ── Mode switcher ──
+  document.getElementById('map-mode').addEventListener('change', async e => {
+    const isHistory = e.target.value === 'history';
+    document.getElementById('history-controls').style.display = isHistory ? 'flex' : 'none';
+    clearInterval(S.mapInterval);
+
+    if (isHistory) {
+      clearRoute();
+      // Populate employee selector
+      try {
+        const emps = await api('GET', '/employees');
+        const sel = document.getElementById('hist-emp');
+        emps.filter(e => e.active).forEach(emp => {
+          const o = document.createElement('option');
+          o.value = emp.id; o.textContent = emp.name;
+          sel.appendChild(o);
+        });
+      } catch (_) {}
+    } else {
+      // Back to live
+      Object.keys(S.markers).forEach(k => { S.map.removeLayer(S.markers[k]); delete S.markers[k]; });
+      if (routeLayer) { S.map.removeLayer(routeLayer); routeLayer = null; }
+      await refresh();
+      S.mapInterval = setInterval(refresh, 30000);
+    }
+  });
+
+  document.getElementById('hist-load').addEventListener('click', loadRoute);
+
   await refresh();
   S.mapInterval = setInterval(refresh, 30000);
 }
@@ -712,31 +805,43 @@ async function pageMap(container) {
 async function pageAttendance(container) {
   container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
 
-  // Default to today
   const todayStr = new Date().toISOString().slice(0,10);
-  let selectedDate = todayStr;
+  // Default range: first day of current month → today
+  const firstOfMonth = todayStr.slice(0,8) + '01';
+  let rangeStart = firstOfMonth;
+  let rangeEnd   = todayStr;
 
-  async function load(date) {
-    const [records, employees] = await Promise.all([
-      api('GET', `/attendance?date=${date}`),
-      api('GET', '/employees'),
-    ]);
-    render(date, records, employees);
+  function buildReportUrl(fmt) {
+    return `/api/reports/attendance/${fmt}?start=${rangeStart}&end=${rangeEnd}`;
   }
 
-  function render(date, records, employees) {
-    // Build lookup by employee_id
+  async function load() {
+    const [records, employees] = await Promise.all([
+      api('GET', `/attendance?date=${rangeEnd}`),   // single-day view for table
+      api('GET', '/employees'),
+    ]);
+    render(records, employees);
+  }
+
+  function render(records, employees) {
     const byEmp = {};
     records.forEach(r => { byEmp[r.employee_id] = r; });
-
     const active = employees.filter(e => e.active);
 
     container.innerHTML = `
       <div class="panel">
         <div class="panel__header">
           <h2>Asistencia</h2>
-          <div class="panel__toolbar">
-            <input type="date" class="filter-select" id="att-date" value="${date}" max="${todayStr}"/>
+          <div class="panel__toolbar" style="gap:.5rem;flex-wrap:wrap;align-items:center">
+            <label class="muted" style="font-size:.8125rem">Día:</label>
+            <input type="date" class="filter-select" id="att-date" value="${rangeEnd}" max="${todayStr}"/>
+            <span style="border-left:1px solid #e5e7eb;height:1.5rem;margin:0 .25rem"></span>
+            <label class="muted" style="font-size:.8125rem">Reporte:</label>
+            <input type="date" class="filter-select" id="rep-start" value="${rangeStart}" max="${todayStr}"/>
+            <span class="muted">al</span>
+            <input type="date" class="filter-select" id="rep-end"   value="${rangeEnd}"   max="${todayStr}"/>
+            <a id="btn-excel" href="${buildReportUrl('excel')}" download class="btn btn--sm" style="background:#16a34a;color:#fff;text-decoration:none;padding:.35rem .75rem;border-radius:.4rem;font-size:.8125rem">⬇ Excel</a>
+            <a id="btn-pdf"   href="${buildReportUrl('pdf')}"   download class="btn btn--sm" style="background:#dc2626;color:#fff;text-decoration:none;padding:.35rem .75rem;border-radius:.4rem;font-size:.8125rem">⬇ PDF</a>
           </div>
         </div>
         <div class="table-wrap">
@@ -770,18 +875,36 @@ async function pageAttendance(container) {
         </div>
       </div>`;
 
+    // Day picker → refresh table
     document.getElementById('att-date').addEventListener('change', async e => {
-      selectedDate = e.target.value;
+      rangeEnd = e.target.value;
+      document.getElementById('rep-end').value = rangeEnd;
+      updateExportLinks();
       const [rec, emp] = await Promise.all([
-        api('GET', `/attendance?date=${selectedDate}`),
+        api('GET', `/attendance?date=${rangeEnd}`),
         api('GET', '/employees'),
       ]);
-      render(selectedDate, rec, emp);
+      render(rec, emp);
     });
+
+    // Range pickers → update export links only
+    document.getElementById('rep-start').addEventListener('change', e => {
+      rangeStart = e.target.value;
+      updateExportLinks();
+    });
+    document.getElementById('rep-end').addEventListener('change', e => {
+      rangeEnd = e.target.value;
+      updateExportLinks();
+    });
+
+    function updateExportLinks() {
+      document.getElementById('btn-excel').href = buildReportUrl('excel');
+      document.getElementById('btn-pdf').href   = buildReportUrl('pdf');
+    }
   }
 
   try {
-    await load(selectedDate);
+    await load();
   } catch (err) {
     container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
   }

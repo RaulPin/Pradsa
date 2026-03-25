@@ -15,15 +15,24 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'lat y lng deben ser números' });
   }
 
-  db.prepare(`
-    INSERT INTO employee_locations (employee_id, lat, lng, accuracy, updated_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(employee_id) DO UPDATE SET
-      lat        = excluded.lat,
-      lng        = excluded.lng,
-      accuracy   = excluded.accuracy,
-      updated_at = excluded.updated_at
-  `).run(req.user.id, lat, lng, accuracy ?? null);
+  db.transaction(() => {
+    // Upsert current location
+    db.prepare(`
+      INSERT INTO employee_locations (employee_id, lat, lng, accuracy, updated_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(employee_id) DO UPDATE SET
+        lat        = excluded.lat,
+        lng        = excluded.lng,
+        accuracy   = excluded.accuracy,
+        updated_at = excluded.updated_at
+    `).run(req.user.id, lat, lng, accuracy ?? null);
+
+    // Save to history
+    db.prepare(`
+      INSERT INTO location_history (employee_id, lat, lng, accuracy, recorded_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(req.user.id, lat, lng, accuracy ?? null);
+  })();
 
   res.json({ message: 'Ubicación actualizada' });
 });
@@ -48,6 +57,22 @@ router.get('/employees', requireRole('admin'), (req, res) => {
     ORDER BY u.name ASC
   `).all();
   res.json(rows);
+});
+
+// GET /api/location/history/:employeeId?date=YYYY-MM-DD  (admin: route history)
+router.get('/history/:employeeId', requireRole('admin'), (req, res) => {
+  const employeeId = parseInt(req.params.employeeId, 10);
+  const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+  const points = db.prepare(`
+    SELECT lat, lng, accuracy, recorded_at
+    FROM location_history
+    WHERE employee_id = ?
+      AND date(recorded_at) = ?
+    ORDER BY recorded_at ASC
+  `).all(employeeId, date);
+
+  res.json(points);
 });
 
 module.exports = router;
