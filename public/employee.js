@@ -209,11 +209,87 @@ function renderLogin() {
         password: fd.get('password'),
       });
       saveAuth(d.token, d.user);
+      if (d.user.must_change_password) {
+        renderForceChangePassword();
+      } else {
+        renderShell();
+        navigate('home');
+      }
+    } catch (err) {
+      errEl.innerHTML = `<p class="field-err">${esc(err.message)}</p>`;
+      btn.disabled = false; btn.textContent = 'Iniciar sesión';
+    }
+  });
+}
+
+// ─── Force password change (ISO 27001:2022) ───────────────────────────────────
+
+const PWD_POLICY_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+const PWD_POLICY_MSG = 'Mínimo 8 caracteres, una mayúscula, una minúscula y un carácter especial';
+
+function renderForceChangePassword() {
+  document.getElementById('app').innerHTML = `
+    <div class="login-page">
+      <div class="login-card">
+        <div class="login-logo">Pradsa</div>
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:.25rem">Cambio de contraseña requerido</h2>
+        <p style="font-size:.85rem;color:#64748b;margin-bottom:1.25rem;text-align:center">
+          Por seguridad (ISO 27001) debes establecer una contraseña personal antes de continuar.
+        </p>
+        <div id="fcp-err"></div>
+        <form id="fcp-form" autocomplete="off">
+          <div class="field">
+            <label class="field__label">Contraseña temporal (actual)</label>
+            <input class="field__input" type="password" name="current_password" required placeholder="••••••••"/>
+          </div>
+          <div class="field">
+            <label class="field__label">Nueva contraseña</label>
+            <input class="field__input" type="password" name="new_password" required placeholder="••••••••"/>
+            <p style="font-size:.75rem;color:#94a3b8;margin-top:.3rem">${esc(PWD_POLICY_MSG)}</p>
+          </div>
+          <div class="field">
+            <label class="field__label">Confirmar nueva contraseña</label>
+            <input class="field__input" type="password" name="confirm_password" required placeholder="••••••••"/>
+          </div>
+          <button class="btn btn--primary btn--block" id="fcp-btn" type="submit">Cambiar contraseña</button>
+        </form>
+      </div>
+    </div>`;
+
+  document.getElementById('fcp-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn  = document.getElementById('fcp-btn');
+    const errEl = document.getElementById('fcp-err');
+    const fd   = new FormData(e.target);
+    const cur  = fd.get('current_password');
+    const nw   = fd.get('new_password');
+    const conf = fd.get('confirm_password');
+
+    errEl.innerHTML = '';
+
+    if (!PWD_POLICY_RE.test(nw)) {
+      errEl.innerHTML = `<p class="field-err">${esc(PWD_POLICY_MSG)}</p>`;
+      return;
+    }
+    if (nw !== conf) {
+      errEl.innerHTML = `<p class="field-err">Las contraseñas no coinciden</p>`;
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      await api('POST', '/auth/change-password', {
+        current_password: cur,
+        new_password: nw,
+      });
+      // Update local user flag
+      S.user = { ...S.user, must_change_password: false };
+      localStorage.setItem('pradsa_user', JSON.stringify(S.user));
       renderShell();
       navigate('home');
     } catch (err) {
       errEl.innerHTML = `<p class="field-err">${esc(err.message)}</p>`;
-      btn.disabled = false; btn.textContent = 'Iniciar sesión';
+      btn.disabled = false; btn.textContent = 'Cambiar contraseña';
     }
   });
 }

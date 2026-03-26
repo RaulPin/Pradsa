@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 const { auth, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
+const { validatePassword } = require('../passwordPolicy');
 
 const router = express.Router();
 
@@ -29,7 +30,13 @@ router.post('/login', (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      must_change_password: user.must_change_password === 1,
+    },
   });
 });
 
@@ -48,9 +55,9 @@ router.post('/change-password', auth, (req, res) => {
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
   }
-  if (new_password.length < 6) {
-    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
-  }
+
+  const policyError = validatePassword(new_password);
+  if (policyError) return res.status(400).json({ error: policyError });
 
   const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
   if (!bcrypt.compareSync(current_password, row.password_hash)) {
@@ -58,7 +65,30 @@ router.post('/change-password', auth, (req, res) => {
   }
 
   const hash = bcrypt.hashSync(new_password, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
+    .run(hash, req.user.id);
+
+  res.json({ message: 'Contraseña actualizada correctamente' });
+});
+
+// PUT /api/auth/me  (used by mobile app)
+router.put('/me', auth, (req, res) => {
+  const { currentPassword, password } = req.body || {};
+  if (!currentPassword || !password) {
+    return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
+  }
+
+  const policyError = validatePassword(password);
+  if (policyError) return res.status(400).json({ error: policyError });
+
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+  if (!bcrypt.compareSync(currentPassword, row.password_hash)) {
+    return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+  }
+
+  const hash = bcrypt.hashSync(password, 10);
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
+    .run(hash, req.user.id);
 
   res.json({ message: 'Contraseña actualizada correctamente' });
 });

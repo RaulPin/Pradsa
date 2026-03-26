@@ -4,6 +4,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../database');
 const { auth, requireRole } = require('../middleware/auth');
+const { validatePassword } = require('../passwordPolicy');
 
 const router = express.Router();
 router.use(auth);
@@ -51,9 +52,9 @@ router.post('/', requireRole('admin'), (req, res) => {
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Email, contraseña y nombre son requeridos' });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
-  }
+
+  const policyError = validatePassword(password);
+  if (policyError) return res.status(400).json({ error: policyError });
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
   if (existing) return res.status(409).json({ error: 'El email ya está registrado' });
@@ -62,7 +63,7 @@ router.post('/', requireRole('admin'), (req, res) => {
 
   const newId = db.transaction(() => {
     const { lastInsertRowid } = db
-      .prepare("INSERT INTO users (email, password_hash, name, role, phone) VALUES (?, ?, ?, 'employee', ?)")
+      .prepare("INSERT INTO users (email, password_hash, name, role, phone, must_change_password) VALUES (?, ?, ?, 'employee', ?, 1)")
       .run(email.toLowerCase().trim(), hash, name.trim(), phone || null);
 
     db.prepare(

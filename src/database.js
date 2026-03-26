@@ -100,6 +100,12 @@ db.exec(`
     ON location_history(employee_id, recorded_at);
 `);
 
+// ── Migrations ────────────────────────────────────────────────────────────────
+// Add must_change_password flag (ISO 27001:2022 — forced change on first login)
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists — safe to ignore */ }
+
 // Seed default admin user if none exists
 const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
 if (!adminExists) {

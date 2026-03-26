@@ -6,6 +6,7 @@ import { storage } from './src/storage';
 import { initBaseUrl, locationApi } from './src/api';
 import AppNavigator from './src/navigation/AppNavigator';
 import LoginScreen from './src/screens/LoginScreen';
+import ForceChangePasswordScreen from './src/screens/ForceChangePasswordScreen';
 
 const LOCATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -55,6 +56,14 @@ export default function App() {
 
   function handleLoginSuccess(loggedUser) {
     setUser(loggedUser);
+    // Don't start GPS tracking until password is changed
+    if (!loggedUser.must_change_password) {
+      startLocationTracking();
+    }
+  }
+
+  function handlePasswordChanged(updatedUser) {
+    setUser(updatedUser);
     startLocationTracking();
   }
 
@@ -74,6 +83,10 @@ export default function App() {
 
   if (!user) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (user.must_change_password) {
+    return <ForceChangePasswordScreen user={user} onPasswordChanged={handlePasswordChanged} />;
   }
 
   return <AppNavigator user={user} onLogout={handleLogout} />;

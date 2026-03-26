@@ -380,7 +380,7 @@ function modalEmployee(emp, onSave) {
           </div>
           ${isNew ? `
           <div class="form-row">
-            <div class="form-group"><label>Contraseña *</label><input name="password" type="password" required minlength="6" placeholder="Mín. 6 caracteres"/></div>
+            <div class="form-group"><label>Contraseña temporal *</label><input name="password" type="password" required minlength="8" placeholder="Mín. 8 car., mayús., minús., especial"/><small class="muted" style="font-size:.72rem">El empleado la cambiará en su primer inicio de sesión (ISO 27001)</small></div>
             <div class="form-group"><label>Teléfono</label><input name="phone" type="tel"/></div>
           </div>` : `
           <div class="form-group"><label>Teléfono</label><input name="phone" type="tel" value="${esc(emp?.phone||'')}"/></div>`}
