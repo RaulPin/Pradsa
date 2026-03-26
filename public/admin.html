@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pradsa Virtual – Administración</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h1>Pradsa Virtual</h1>
+      <span>Panel de Administración</span>
+    </div>
+    <div class="sidebar-nav">
+      <a href="#dashboard" class="nav-link active" data-section="dashboard">
+        <span class="icon">📊</span> Dashboard
+      </a>
+      <a href="#users" class="nav-link" data-section="users">
+        <span class="icon">👥</span> Usuarios
+      </a>
+      <a href="#interviews" class="nav-link" data-section="interviews">
+        <span class="icon">🎥</span> Entrevistas
+      </a>
+      <a href="#audit" class="nav-link" data-section="audit">
+        <span class="icon">📋</span> Auditoría
+      </a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info" id="sidebarUser"></div>
+      <a href="#" id="logoutBtn" style="color:#94a3b8;font-size:.82rem">⬅ Cerrar sesión</a>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="topbarTitle">Dashboard</h2>
+      <div id="topbarActions"></div>
+    </div>
+    <div class="page-body">
+
+      <!-- ── Dashboard ── -->
+      <div id="sec-dashboard" class="section">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="card">
+          <div class="card-header"><h3>Entrevistas recientes</h3></div>
+          <div class="table-wrap" id="recentInterviewsTable"></div>
+        </div>
+      </div>
+
+      <!-- ── Users ── -->
+      <div id="sec-users" class="section hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>Gestión de Usuarios</h3>
+            <button class="btn btn-primary btn-sm" id="newUserBtn">+ Nuevo usuario</button>
+          </div>
+          <div id="usersAlert" class="alert"></div>
+          <div class="table-wrap" id="usersTable"></div>
+        </div>
+      </div>
+
+      <!-- ── Interviews ── -->
+      <div id="sec-interviews" class="section hidden">
+        <div class="card">
+          <div class="card-header"><h3>Todas las Entrevistas</h3></div>
+          <div class="table-wrap" id="allInterviewsTable"></div>
+        </div>
+      </div>
+
+      <!-- ── Audit ── -->
+      <div id="sec-audit" class="section hidden">
+        <div class="card">
+          <div class="card-header"><h3>Registros de Auditoría (ISO 27001:2022)</h3></div>
+          <div class="table-wrap" id="auditTable"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Create User -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="userModalTitle">Nuevo Usuario</h3>
+      <button class="modal-close" id="closeUserModal">×</button>
+    </div>
+    <div id="userModalAlert" class="alert"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" id="uFullName" placeholder="Nombre Apellido">
+      </div>
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" id="uUsername" placeholder="usuario123">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Correo electrónico</label>
+      <input type="email" id="uEmail" placeholder="correo@empresa.com">
+    </div>
+    <div class="form-group">
+      <label>Rol</label>
+      <select id="uRole">
+        <option value="user">Usuario (Analista)</option>
+        <option value="admin">Administrador</option>
+      </select>
+    </div>
+    <div id="tempPwSection" class="hidden alert alert-success">
+      <strong>Contraseña temporal generada:</strong><br>
+      <code id="tempPwDisplay" style="font-size:1.1rem;letter-spacing:.08em"></code><br>
+      <span style="font-size:.8rem">Comparta esta contraseña de forma segura. El usuario deberá cambiarla en su primer inicio de sesión.</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelUserModal">Cancelar</button>
+      <button class="btn btn-primary" id="saveUserBtn">Crear Usuario</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Reset Password -->
+<div class="modal-overlay" id="resetPwModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Restablecer Contraseña</h3>
+      <button class="modal-close" onclick="closeModal('resetPwModal')">×</button>
+    </div>
+    <p>¿Confirma que desea restablecer la contraseña del usuario <strong id="resetPwUsername"></strong>?</p>
+    <p class="text-muted mt-2">Se generará una contraseña temporal y el usuario deberá cambiarla en su próximo inicio.</p>
+    <div id="resetPwResult" class="alert mt-3"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('resetPwModal')">Cancelar</button>
+      <button class="btn btn-warning" id="confirmResetPw">Restablecer</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  if (!API.requireAdmin()) throw 'Not authorized';
+
+  const user = API.getUser();
+  document.getElementById('sidebarUser').textContent = user?.fullName || user?.username;
+
+  // ── Navigation ──────────────────────────────────────────────────
+  let currentSection = 'dashboard';
+  document.querySelectorAll('.nav-link').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      navigateTo(a.dataset.section);
+    });
+  });
+
+  function navigateTo(section) {
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.section === section));
+    document.getElementById(`sec-${section}`)?.classList.remove('hidden');
+    document.getElementById('topbarTitle').textContent = {
+      dashboard: 'Dashboard', users: 'Usuarios', interviews: 'Entrevistas', audit: 'Auditoría'
+    }[section] || section;
+    currentSection = section;
+    loadSection(section);
+  }
+
+  async function loadSection(section) {
+    if (section === 'dashboard') loadDashboard();
+    else if (section === 'users') loadUsers();
+    else if (section === 'interviews') loadAllInterviews();
+    else if (section === 'audit') loadAudit();
+  }
+
+  // ── Dashboard ────────────────────────────────────────────────────
+  async function loadDashboard() {
+    try {
+      const stats = await API.admin.getStats();
+      const grid = document.getElementById('statsGrid');
+      grid.innerHTML = `
+        ${stat(stats.totalUsers, 'Usuarios Totales')}
+        ${stat(stats.activeUsers, 'Usuarios Activos')}
+        ${stat(stats.totalInterview, 'Entrevistas Totales')}
+        ${stat(stats.scheduled, 'Programadas')}
+        ${stat(stats.inProgress, 'En Curso')}
+        ${stat(stats.completed, 'Completadas')}
+        ${stat(stats.pyme, 'Crédito PYME')}
+        ${stat(stats.fiduciario, 'Fiduciario')}
+      `;
+      const interviews = await API.admin.getInterviews();
+      renderInterviewsTable(interviews.slice(0, 10), document.getElementById('recentInterviewsTable'));
+    } catch (e) { console.error(e); }
+  }
+
+  function stat(val, lbl) {
+    return `<div class="stat-card"><div class="val">${val}</div><div class="lbl">${lbl}</div></div>`;
+  }
+
+  // ── Users ────────────────────────────────────────────────────────
+  let usersData = [];
+  let resetUserId = null;
+
+  async function loadUsers() {
+    try {
+      usersData = await API.admin.getUsers();
+      const tbl = document.getElementById('usersTable');
+      tbl.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Nombre</th><th>Usuario</th><th>Correo</th><th>Rol</th>
+            <th>Estado</th><th>Últ. ingreso</th><th>Acciones</th>
+          </tr></thead>
+          <tbody>${usersData.map(u => `
+            <tr>
+              <td>${esc(u.full_name)}</td>
+              <td>${esc(u.username)}</td>
+              <td>${esc(u.email)}</td>
+              <td><span class="badge badge-${u.role}">${u.role}</span></td>
+              <td>
+                ${u.is_active ? '<span class="badge badge-in-progress">Activo</span>' : '<span class="badge badge-cancelled">Inactivo</span>'}
+                ${u.locked_until && new Date(u.locked_until)>new Date() ? '<span class="badge badge-cancelled" title="Bloqueado">🔒</span>' : ''}
+                ${u.must_change_password ? '<span class="badge badge-waiting" title="Debe cambiar contraseña">⚠</span>' : ''}
+              </td>
+              <td>${u.last_login ? fmtDate(u.last_login) : '—'}</td>
+              <td>
+                <div class="flex gap-2">
+                  ${u.locked_until && new Date(u.locked_until)>new Date()
+                    ? `<button class="btn btn-secondary btn-sm" onclick="unlockUser('${u.id}')">Desbloquear</button>` : ''}
+                  <button class="btn btn-warning btn-sm" onclick="openResetPw('${u.id}','${esc(u.full_name)}')">Reset PW</button>
+                  <button class="btn ${u.is_active?'btn-danger':'btn-success'} btn-sm"
+                    onclick="toggleActive('${u.id}',${!u.is_active})">
+                    ${u.is_active ? 'Desactivar' : 'Activar'}
+                  </button>
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch (e) { console.error(e); }
+  }
+
+  document.getElementById('newUserBtn').addEventListener('click', () => {
+    resetUserForm();
+    openModal('userModal');
+  });
+  document.getElementById('closeUserModal').addEventListener('click', () => closeModal('userModal'));
+  document.getElementById('cancelUserModal').addEventListener('click', () => closeModal('userModal'));
+  document.getElementById('saveUserBtn').addEventListener('click', createUser);
+
+  function resetUserForm() {
+    ['uFullName','uUsername','uEmail'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('uRole').value='user';
+    document.getElementById('tempPwSection').classList.add('hidden');
+    document.getElementById('saveUserBtn').textContent='Crear Usuario';
+    document.getElementById('saveUserBtn').disabled=false;
+    hideAlert(document.getElementById('userModalAlert'));
+  }
+
+  async function createUser() {
+    const fullName = document.getElementById('uFullName').value.trim();
+    const username = document.getElementById('uUsername').value.trim();
+    const email    = document.getElementById('uEmail').value.trim();
+    const role     = document.getElementById('uRole').value;
+    const alert    = document.getElementById('userModalAlert');
+    const btn      = document.getElementById('saveUserBtn');
+
+    if (!fullName || !username || !email) {
+      showAlert(alert, 'error', 'Todos los campos son requeridos.');
+      return;
+    }
+    btn.disabled = true; btn.textContent = 'Creando...';
+    try {
+      const res = await API.admin.createUser({ fullName, username, email, role });
+      document.getElementById('tempPwDisplay').textContent = res.temporaryPassword;
+      document.getElementById('tempPwSection').classList.remove('hidden');
+      btn.textContent = 'Cerrar';
+      btn.onclick = () => { closeModal('userModal'); loadUsers(); };
+    } catch (e) {
+      showAlert(alert, 'error', e.message);
+      btn.disabled = false; btn.textContent = 'Crear Usuario';
+    }
+  }
+
+  async function toggleActive(id, active) {
+    try { await API.admin.updateUser(id, { isActive: active }); loadUsers(); }
+    catch (e) { alert(e.message); }
+  }
+
+  async function unlockUser(id) {
+    try { await API.admin.unlockUser(id); loadUsers(); }
+    catch (e) { alert(e.message); }
+  }
+
+  function openResetPw(id, name) {
+    resetUserId = id;
+    document.getElementById('resetPwUsername').textContent = name;
+    document.getElementById('resetPwResult').className = 'alert mt-3';
+    document.getElementById('resetPwResult').textContent = '';
+    document.getElementById('confirmResetPw').disabled = false;
+    document.getElementById('confirmResetPw').textContent = 'Restablecer';
+    openModal('resetPwModal');
+  }
+
+  document.getElementById('confirmResetPw').addEventListener('click', async () => {
+    const btn = document.getElementById('confirmResetPw');
+    const res_el = document.getElementById('resetPwResult');
+    btn.disabled = true; btn.textContent = 'Procesando...';
+    try {
+      const data = await API.admin.resetPassword(resetUserId);
+      res_el.className = 'alert alert-success mt-3 show';
+      res_el.innerHTML = `Nueva contraseña temporal: <strong>${data.temporaryPassword}</strong><br><small>Comparta de forma segura.</small>`;
+      btn.textContent = 'Listo';
+      loadUsers();
+    } catch (e) {
+      res_el.className = 'alert alert-error mt-3 show';
+      res_el.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Restablecer';
+    }
+  });
+
+  // ── All interviews ────────────────────────────────────────────────
+  async function loadAllInterviews() {
+    try {
+      const interviews = await API.admin.getInterviews();
+      renderInterviewsTable(interviews, document.getElementById('allInterviewsTable'));
+    } catch(e) { console.error(e); }
+  }
+
+  function renderInterviewsTable(interviews, container) {
+    if (!interviews.length) { container.innerHTML = '<p class="text-muted" style="padding:16px">Sin entrevistas.</p>'; return; }
+    container.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Entrevistado</th><th>Tipo</th><th>Analista</th>
+          <th>Programada</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody>${interviews.map(i => `
+          <tr>
+            <td>${esc(i.interviewee_name)}<br><small class="text-muted">${esc(i.interviewee_id_doc)}</small></td>
+            <td><span class="badge badge-${i.interview_type}">${i.interview_type.toUpperCase()}</span></td>
+            <td>${esc(i.interviewer_name || '—')}</td>
+            <td>${fmtDate(i.scheduled_at)}</td>
+            <td>${statusBadge(i.status)}</td>
+            <td><a href="/interview?id=${i.id}" class="btn btn-secondary btn-sm">Ver</a></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── Audit ────────────────────────────────────────────────────────
+  async function loadAudit() {
+    try {
+      const logs = await API.admin.getAuditLogs('?limit=100');
+      const tbl = document.getElementById('auditTable');
+      tbl.innerHTML = `
+        <table>
+          <thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Acción</th><th>Recurso</th><th>IP</th><th>Detalles</th></tr></thead>
+          <tbody>${logs.map(l => `
+            <tr>
+              <td style="white-space:nowrap">${fmtDate(l.created_at)}</td>
+              <td>${esc(l.username || '—')}</td>
+              <td><code style="font-size:.8rem">${esc(l.action)}</code></td>
+              <td>${esc(l.resource || '—')}</td>
+              <td>${esc(l.ip_address || '—')}</td>
+              <td><small>${esc(l.details || '—')}</small></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Logout ────────────────────────────────────────────────────────
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try { await API.auth.logout(); } catch {}
+    API.clearToken();
+    window.location.href = '/login';
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function openModal(id)  { document.getElementById(id).classList.add('show'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+  function showAlert(el, type, msg) { el.className=`alert alert-${type} show`; el.textContent=msg; }
+  function hideAlert(el) { el.className='alert'; el.textContent=''; }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function fmtDate(s) { if(!s) return '—'; return new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}); }
+  function statusBadge(s) {
+    const map={scheduled:'Programada',waiting:'Esperando',in_progress:'En curso',completed:'Completada',cancelled:'Cancelada'};
+    return `<span class="badge badge-${s.replace('_','-')}">${map[s]||s}</span>`;
+  }
+
+  // Init
+  loadSection('dashboard');
+</script>
+</body>
+</html>

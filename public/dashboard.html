@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pradsa Virtual – Mis Entrevistas</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h1>Pradsa Virtual</h1>
+      <span>Portal del Analista</span>
+    </div>
+    <div class="sidebar-nav">
+      <a href="#interviews" class="nav-link active" data-section="interviews">
+        <span class="icon">🎥</span> Mis Entrevistas
+      </a>
+      <a href="#schedule" class="nav-link" data-section="schedule">
+        <span class="icon">📅</span> Agendar Visita
+      </a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info" id="sidebarUser"></div>
+      <a href="#" id="logoutBtn" style="color:#94a3b8;font-size:.82rem">⬅ Cerrar sesión</a>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="topbarTitle">Mis Entrevistas</h2>
+    </div>
+    <div class="page-body">
+
+      <!-- ── My Interviews ── -->
+      <div id="sec-interviews" class="section">
+        <div id="listAlert" class="alert"></div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Entrevistas / Visitas Digitales</h3>
+            <button class="btn btn-primary btn-sm" onclick="navigateTo('schedule')">+ Agendar</button>
+          </div>
+          <div class="table-wrap" id="interviewsTable"></div>
+        </div>
+      </div>
+
+      <!-- ── Schedule ── -->
+      <div id="sec-schedule" class="section hidden">
+        <div class="card" style="max-width:680px">
+          <div class="card-header"><h3>Agendar Nueva Visita Digital</h3></div>
+          <div id="scheduleAlert" class="alert"></div>
+          <div class="form-group">
+            <label>Tipo de Crédito</label>
+            <select id="interviewType">
+              <option value="">— Seleccione —</option>
+              <option value="pyme">Crédito PYME</option>
+              <option value="fiduciario">Crédito Fiduciario</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre del Entrevistado</label>
+              <input type="text" id="intervieweeName" placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+              <label>Documento de Identidad</label>
+              <input type="text" id="intervieweeIdDoc" placeholder="Cédula / NIT / RUC">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Correo del Entrevistado</label>
+              <input type="email" id="intervieweeEmail" placeholder="correo@ejemplo.com (opcional)">
+            </div>
+            <div class="form-group">
+              <label>Teléfono del Entrevistado</label>
+              <input type="tel" id="intervieweePhone" placeholder="+57 300 000 0000 (opcional)">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Dirección Declarada (del negocio/inmueble a visitar)</label>
+            <input type="text" id="declaredAddress" placeholder="Dirección completa">
+            <div class="hint">El sistema verificará que la ubicación GPS del entrevistado coincida con esta dirección.</div>
+          </div>
+          <div class="form-group">
+            <label>Fecha y Hora de la Visita</label>
+            <input type="datetime-local" id="scheduledAt">
+          </div>
+          <div class="flex gap-2 mt-4">
+            <button class="btn btn-secondary" onclick="navigateTo('interviews')">Cancelar</button>
+            <button class="btn btn-primary" id="scheduleBtn">Agendar Visita</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Interview created -->
+<div class="modal-overlay" id="createdModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✅ Visita Agendada</h3>
+      <button class="modal-close" onclick="closeModal('createdModal')">×</button>
+    </div>
+    <div class="alert alert-success show">La visita digital ha sido agendada exitosamente.</div>
+    <div class="form-group mt-3">
+      <label>Enlace para el Entrevistado</label>
+      <div class="flex gap-2">
+        <input type="text" id="guestLinkInput" readonly style="flex:1;background:#f8fafc">
+        <button class="btn btn-secondary btn-sm" onclick="copyLink()">Copiar</button>
+      </div>
+      <div class="hint">Comparta este enlace con el cliente para que pueda conectarse a la visita.</div>
+    </div>
+    <div class="form-group">
+      <label>Código de Sala</label>
+      <input type="text" id="roomCodeDisplay" readonly style="letter-spacing:.15em;font-weight:700;background:#f8fafc">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('createdModal')">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  if (!API.requireAuth()) throw 'Not auth';
+
+  const user = API.getUser();
+  document.getElementById('sidebarUser').textContent = user?.fullName || user?.username;
+
+  // ── Navigation ──────────────────────────────────────────────────
+  document.querySelectorAll('.nav-link').forEach(a => {
+    a.addEventListener('click', e => { e.preventDefault(); navigateTo(a.dataset.section); });
+  });
+
+  function navigateTo(section) {
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.section === section));
+    document.getElementById(`sec-${section}`)?.classList.remove('hidden');
+    document.getElementById('topbarTitle').textContent = {
+      interviews: 'Mis Entrevistas', schedule: 'Agendar Visita',
+    }[section] || section;
+    if (section === 'interviews') loadInterviews();
+  }
+
+  // ── Load interviews ──────────────────────────────────────────────
+  async function loadInterviews() {
+    try {
+      const list = await API.interviews.list();
+      const tbl = document.getElementById('interviewsTable');
+      if (!list.length) {
+        tbl.innerHTML = '<p class="text-muted" style="padding:16px">No tiene visitas agendadas. Haga clic en "+ Agendar" para crear una.</p>';
+        return;
+      }
+      tbl.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Entrevistado</th><th>Tipo</th><th>Dirección</th>
+            <th>Fecha</th><th>Estado</th><th>Enlace Invitado</th><th>Acciones</th>
+          </tr></thead>
+          <tbody>${list.map(i => `
+            <tr>
+              <td><strong>${esc(i.interviewee_name)}</strong><br><small>${esc(i.interviewee_id_doc)}</small></td>
+              <td><span class="badge badge-${i.interview_type}">${i.interview_type.toUpperCase()}</span></td>
+              <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.declared_address)}</td>
+              <td style="white-space:nowrap">${fmtDate(i.scheduled_at)}</td>
+              <td>${statusBadge(i.status)}</td>
+              <td>
+                <button class="btn btn-secondary btn-sm" onclick="copyGuestLink('${i.guest_token}')">📋 Copiar enlace</button>
+              </td>
+              <td>
+                ${['scheduled','waiting','in_progress'].includes(i.status)
+                  ? `<a href="/interview?id=${i.id}" class="btn btn-primary btn-sm">Iniciar</a>` : ''}
+                ${i.status==='completed'
+                  ? `<a href="/interview?id=${i.id}&view=1" class="btn btn-secondary btn-sm">Ver</a>` : ''}
+                ${i.status==='scheduled'
+                  ? `<button class="btn btn-danger btn-sm" onclick="cancelInterview('${i.id}')">Cancelar</button>` : ''}
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Schedule interview ────────────────────────────────────────────
+  // Set default datetime to next hour
+  const now = new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours()+1);
+  document.getElementById('scheduledAt').value = now.toISOString().slice(0,16);
+
+  document.getElementById('scheduleBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('scheduleBtn');
+    const alert = document.getElementById('scheduleAlert');
+    const payload = {
+      interviewType:    document.getElementById('interviewType').value,
+      intervieweeName:  document.getElementById('intervieweeName').value.trim(),
+      intervieweeIdDoc: document.getElementById('intervieweeIdDoc').value.trim(),
+      intervieweeEmail: document.getElementById('intervieweeEmail').value.trim(),
+      intervieweePhone: document.getElementById('intervieweePhone').value.trim(),
+      declaredAddress:  document.getElementById('declaredAddress').value.trim(),
+      scheduledAt:      document.getElementById('scheduledAt').value,
+    };
+    if (!payload.interviewType || !payload.intervieweeName || !payload.intervieweeIdDoc || !payload.declaredAddress || !payload.scheduledAt) {
+      showAlert(alert, 'error', 'Complete todos los campos requeridos.');
+      return;
+    }
+    btn.disabled = true; btn.textContent = 'Agendando...';
+    try {
+      const interview = await API.interviews.create(payload);
+      const guestLink = `${location.origin}/guest?token=${interview.guest_token}`;
+      document.getElementById('guestLinkInput').value = guestLink;
+      document.getElementById('roomCodeDisplay').value = interview.room_code;
+      openModal('createdModal');
+      btn.disabled = false; btn.textContent = 'Agendar Visita';
+      // Reset form
+      ['intervieweeName','intervieweeIdDoc','intervieweeEmail','intervieweePhone','declaredAddress'].forEach(id => document.getElementById(id).value='');
+      document.getElementById('interviewType').value='';
+      hideAlert(alert);
+      navigateTo('interviews');
+    } catch(e) {
+      showAlert(alert, 'error', e.message);
+      btn.disabled=false; btn.textContent='Agendar Visita';
+    }
+  });
+
+  async function cancelInterview(id) {
+    if (!confirm('¿Confirma la cancelación de esta visita?')) return;
+    try { await API.interviews.cancel(id); loadInterviews(); }
+    catch(e) { alert(e.message); }
+  }
+
+  function copyGuestLink(token) {
+    const link = `${location.origin}/guest?token=${token}`;
+    navigator.clipboard.writeText(link).then(() => alert('Enlace copiado al portapapeles.'));
+  }
+  function copyLink() {
+    const link = document.getElementById('guestLinkInput').value;
+    navigator.clipboard.writeText(link).then(() => alert('Enlace copiado.'));
+  }
+
+  // ── Logout ────────────────────────────────────────────────────────
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try { await API.auth.logout(); } catch {}
+    API.clearToken();
+    window.location.href = '/login';
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function openModal(id)  { document.getElementById(id).classList.add('show'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+  function showAlert(el, type, msg) { el.className=`alert alert-${type} show`; el.textContent=msg; }
+  function hideAlert(el)  { el.className='alert'; el.textContent=''; }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtDate(s) { if(!s) return '—'; return new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}); }
+  function statusBadge(s) {
+    const map={scheduled:'Programada',waiting:'Esperando',in_progress:'En curso',completed:'Completada',cancelled:'Cancelada'};
+    return `<span class="badge badge-${s.replace('_','-')}">${map[s]||s}</span>`;
+  }
+
+  loadInterviews();
+</script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pradsa Virtual – Visita Digital</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .step { display: none; }
+    .step.active { display: block; }
+    #guestCallPage { display: none; }
+    #guestCallPage.active { display: flex; }
+  </style>
+</head>
+<body>
+
+<!-- ── PRE-CALL FLOW ─────────────────────────────────────────────────────── -->
+<div class="guest-page" id="preCallPage">
+  <div class="guest-card">
+    <h1>Pradsa Virtual</h1>
+    <p class="subtitle">Visita Digital para Crédito</p>
+
+    <div id="mainAlert" class="alert"></div>
+
+    <!-- Step 1: Verify identity -->
+    <div class="step active" id="step1">
+      <h3 style="margin-bottom:12px">Verificar Identidad</h3>
+      <p class="text-muted mb-4" style="font-size:.88rem">
+        Por favor confirme sus datos para continuar con la visita.
+      </p>
+      <div id="interviewInfo" class="hidden">
+        <div class="alert alert-info show" id="interviewDetails"></div>
+      </div>
+      <div class="form-group">
+        <label>Su Nombre Completo</label>
+        <input type="text" id="guestName" placeholder="Como aparece en su identificación">
+      </div>
+      <div class="form-group">
+        <label>Número de Identificación</label>
+        <input type="text" id="guestId" placeholder="Cédula / NIT / Pasaporte">
+      </div>
+      <button class="btn btn-primary w-full btn-lg" id="verifyBtn">Verificar y Continuar</button>
+    </div>
+
+    <!-- Step 2: Request permissions -->
+    <div class="step" id="step2">
+      <h3 style="margin-bottom:8px">Permisos Requeridos</h3>
+      <p class="text-muted mb-4" style="font-size:.88rem">
+        Para realizar la visita digital es <strong>obligatorio</strong> conceder los siguientes permisos:
+      </p>
+
+      <div class="permission-item" id="perm-camera">
+        <span class="perm-icon">📷</span>
+        <div>
+          <div style="font-weight:600">Cámara</div>
+          <div style="font-size:.8rem;color:var(--c-muted)">Requerida para la videollamada</div>
+        </div>
+        <span class="perm-status pending" id="perm-camera-status">Pendiente</span>
+      </div>
+      <div class="permission-item" id="perm-mic">
+        <span class="perm-icon">🎤</span>
+        <div>
+          <div style="font-weight:600">Micrófono</div>
+          <div style="font-size:.8rem;color:var(--c-muted)">Requerido para la videollamada</div>
+        </div>
+        <span class="perm-status pending" id="perm-mic-status">Pendiente</span>
+      </div>
+      <div class="permission-item" id="perm-location">
+        <span class="perm-icon">📍</span>
+        <div>
+          <div style="font-weight:600">Ubicación GPS</div>
+          <div style="font-size:.8rem;color:var(--c-muted)">Para verificar la dirección declarada</div>
+        </div>
+        <span class="perm-status pending" id="perm-location-status">Pendiente</span>
+      </div>
+
+      <div id="locationInfo" class="hidden alert alert-info mt-3"></div>
+
+      <div class="alert alert-warning show mt-3" style="font-size:.82rem">
+        <strong>Aviso:</strong> Sin estos permisos no podrá iniciar la visita. Si rechaza alguno, cierre y vuelva a abrir el enlace en su navegador.
+      </div>
+
+      <button class="btn btn-primary w-full btn-lg mt-4" id="requestPermsBtn">Conceder Permisos</button>
+    </div>
+
+    <!-- Step 3: Ready to join -->
+    <div class="step" id="step3">
+      <div class="alert alert-success show">
+        <strong>✓ Todo listo.</strong> Sus permisos han sido concedidos correctamente.
+      </div>
+      <div style="text-align:center; margin: 20px 0;">
+        <div style="font-size:3rem">🎥</div>
+        <p style="font-weight:600; margin-top:8px" id="readyInterviewerName"></p>
+        <p class="text-muted" style="font-size:.88rem" id="readyInterviewType"></p>
+      </div>
+      <button class="btn btn-primary w-full btn-lg" id="joinCallBtn">Unirse a la Visita</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CALL PAGE ─────────────────────────────────────────────────────────── -->
+<div class="video-shell" id="guestCallPage">
+  <div class="video-topbar">
+    <div class="interview-info">
+      <strong id="callInfoName">Visita Digital</strong>
+      <span id="callInfoType"></span>
+    </div>
+    <div class="flex gap-3" style="align-items:center">
+      <div class="connection-status">
+        <div class="connection-dot disconnected" id="gConnDot"></div>
+        <span id="gConnLabel">Conectando...</span>
+      </div>
+      <span class="call-timer" id="gTimer">00:00</span>
+    </div>
+  </div>
+
+  <div class="video-area" style="grid-template-columns:1fr">
+    <div class="video-main" style="position:relative">
+      <video id="gRemoteVideo" autoplay playsinline></video>
+      <video id="gLocalVideo" autoplay playsinline muted></video>
+      <!-- Reconnect overlay -->
+      <div class="reconnect-overlay" id="gReconnectOverlay">
+        <div class="spinner"></div>
+        <span id="gReconnectMsg">Reconectando...</span>
+      </div>
+      <!-- Waiting overlay -->
+      <div class="reconnect-overlay" id="gWaitingOverlay" style="display:flex">
+        <div class="spinner"></div>
+        <span>Esperando al analista...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="video-controls">
+    <button class="btn-icon" id="gBtnMic">🎤</button>
+    <button class="btn-icon" id="gBtnCam">📹</button>
+    <button class="btn-icon danger" id="gBtnEnd" title="Finalizar visita">📵</button>
+    <span style="color:#8b949e;font-size:.82rem">Puede finalizar la llamada en cualquier momento</span>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  const urlParams = new URLSearchParams(location.search);
+  const guestToken = urlParams.get('token');
+  if (!guestToken) { document.getElementById('mainAlert').className='alert alert-error show'; document.getElementById('mainAlert').textContent='Enlace inválido. Contacte al analista.'; }
+
+  let interviewData = null;
+  let localStream   = null;
+  let peerConn      = null;
+  let ws            = null;
+  let wsRetry       = 0;
+  let micOn = true, camOn = true;
+  let timerInterval = null, timerSeconds = 0;
+
+  const ICE_SERVERS = [
+    { urls:'stun:stun.l.google.com:19302' },
+    { urls:'stun:stun1.l.google.com:19302' },
+  ];
+
+  // ── Step 1: Load interview info and verify identity ─────────────────────
+  (async () => {
+    if (!guestToken) return;
+    try {
+      interviewData = await API.session.guestInfo(guestToken);
+      const detailEl = document.getElementById('interviewDetails');
+      detailEl.innerHTML = `
+        <strong>${interviewData.interviewee_name}</strong> · ${interviewData.interview_type.toUpperCase()}<br>
+        Analista: ${interviewData.interviewer_name}<br>
+        Dirección: ${interviewData.declared_address}
+      `;
+      document.getElementById('interviewInfo').classList.remove('hidden');
+      document.getElementById('guestName').value = interviewData.interviewee_name;
+    } catch(e) {
+      showAlert('error', e.message || 'Enlace inválido o expirado.');
+    }
+  })();
+
+  document.getElementById('verifyBtn').addEventListener('click', () => {
+    const name = document.getElementById('guestName').value.trim();
+    const id   = document.getElementById('guestId').value.trim();
+    if (!name || !id) { showAlert('error','Complete sus datos para continuar.'); return; }
+    // Fuzzy match name
+    if (interviewData) {
+      const expected = interviewData.interviewee_name.toLowerCase().replace(/\s+/g,' ');
+      const given    = name.toLowerCase().replace(/\s+/g,' ');
+      const match    = expected.includes(given.split(' ')[0]) || given.includes(expected.split(' ')[0]);
+      if (!match) { showAlert('warning','El nombre no coincide con el esperado. Verifique sus datos.'); return; }
+    }
+    showAlert('','');
+    goStep('step2');
+  });
+
+  // ── Step 2: Request permissions ──────────────────────────────────────────
+  let permCamera = false, permMic = false, permLocation = false;
+  let locationCoords = null;
+
+  document.getElementById('requestPermsBtn').addEventListener('click', requestAllPerms);
+
+  async function requestAllPerms() {
+    const btn = document.getElementById('requestPermsBtn');
+    btn.disabled = true; btn.textContent = 'Solicitando permisos...';
+
+    // Camera + Mic
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      permCamera = true; permMic = true;
+      setPermStatus('camera', true); setPermStatus('mic', true);
+    } catch(e) {
+      setPermStatus('camera', false); setPermStatus('mic', false);
+      showAlert('error', 'Cámara/micrófono denegados. Permita el acceso en su navegador y recargue.');
+      btn.disabled = false; btn.textContent = 'Reintentar';
+      return;
+    }
+
+    // Location – mandatory
+    try {
+      locationCoords = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
+      });
+      permLocation = true;
+      setPermStatus('location', true);
+      try {
+        const res = await API.session.guestLocation(guestToken, locationCoords.coords.latitude, locationCoords.coords.longitude);
+        const locInfo = document.getElementById('locationInfo');
+        locInfo.classList.remove('hidden');
+        if (res.distanceM != null) {
+          const dist = Math.round(res.distanceM);
+          locInfo.textContent = dist < 500
+            ? `✓ Ubicación verificada (a ~${dist} m de la dirección declarada)`
+            : `⚠ Se encuentra a ~${dist} m de la dirección declarada`;
+        } else {
+          locInfo.textContent = '✓ Ubicación registrada.';
+        }
+      } catch {}
+    } catch(e) {
+      setPermStatus('location', false);
+      showAlert('error', 'Ubicación denegada. La ubicación GPS es obligatoria para continuar.');
+      btn.disabled = false; btn.textContent = 'Reintentar';
+      return;
+    }
+
+    if (permCamera && permMic && permLocation) {
+      const readyName = document.getElementById('readyInterviewerName');
+      const readyType = document.getElementById('readyInterviewType');
+      if (interviewData) {
+        readyName.textContent = `Analista: ${interviewData.interviewer_name}`;
+        readyType.textContent = `Tipo de crédito: ${interviewData.interview_type.toUpperCase()}`;
+      }
+      goStep('step3');
+    }
+  }
+
+  function setPermStatus(perm, granted) {
+    const el = document.getElementById(`perm-${perm}-status`);
+    el.textContent = granted ? 'Concedido ✓' : 'Denegado ✗';
+    el.className = `perm-status ${granted ? 'granted' : 'denied'}`;
+  }
+
+  // ── Step 3: Join call ────────────────────────────────────────────────────
+  document.getElementById('joinCallBtn').addEventListener('click', async () => {
+    try {
+      const res = await API.session.guestJoin(guestToken);
+      interviewData.room_code = res.roomCode;
+    } catch(e) { showAlert('error', e.message); return; }
+
+    // Show call page
+    document.getElementById('preCallPage').style.display = 'none';
+    const callPage = document.getElementById('guestCallPage');
+    callPage.style.display = 'flex';
+
+    document.getElementById('callInfoName').textContent = interviewData?.interviewee_name || 'Visita Digital';
+    document.getElementById('callInfoType').textContent = interviewData?.interview_type?.toUpperCase() || '';
+
+    document.getElementById('gLocalVideo').srcObject = localStream;
+    connectGuestWS();
+  });
+
+  // ── WebSocket ─────────────────────────────────────────────────────────────
+  function connectGuestWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+    ws.onopen = () => {
+      wsRetry = 0;
+      ws.send(JSON.stringify({ type: wsRetry>0?'reconnect':'join', roomCode: interviewData.room_code, role:'guest' }));
+      setGConn('connecting','Conectando...');
+    };
+
+    ws.onmessage = async (e) => {
+      const msg = JSON.parse(e.data);
+      switch(msg.type) {
+        case 'joined':
+          setGConn('connecting','Esperando analista...');
+          break;
+        case 'ready':
+          document.getElementById('gWaitingOverlay').style.display='none';
+          setGConn('connected','Conectado');
+          if (msg.initiator) await gStartCall();
+          break;
+        case 'offer':
+          await gHandleOffer(msg.sdp);
+          break;
+        case 'answer':
+          await gHandleAnswer(msg.sdp);
+          break;
+        case 'ice-candidate':
+          await gHandleIce(msg.candidate);
+          break;
+        case 'peer-left':
+          setGConn('disconnected','Analista desconectado');
+          stopGTimer();
+          document.getElementById('gWaitingOverlay').style.display='flex';
+          break;
+        case 'peer-reconnected':
+          setGConn('connected','Reconectado');
+          break;
+      }
+    };
+
+    ws.onclose = () => {
+      setGConn('disconnected','Desconectado');
+      scheduleGuestWsReconnect();
+    };
+    ws.onerror = () => setGConn('disconnected','Error de conexión');
+  }
+
+  function scheduleGuestWsReconnect() {
+    const delay = Math.min(1000 * Math.pow(2, wsRetry), 30000);
+    wsRetry++;
+    document.getElementById('gReconnectOverlay').classList.add('show');
+    document.getElementById('gReconnectMsg').textContent=`Reconectando en ${Math.round(delay/1000)}s...`;
+    setTimeout(() => {
+      document.getElementById('gReconnectMsg').textContent='Reconectando...';
+      connectGuestWS();
+    }, delay);
+  }
+
+  // ── WebRTC ────────────────────────────────────────────────────────────────
+  function createGuestPeer() {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    pc.ontrack = (e) => {
+      document.getElementById('gRemoteVideo').srcObject = e.streams[0];
+      document.getElementById('gReconnectOverlay').classList.remove('show');
+      startGTimer();
+    };
+    pc.onicecandidate = (e) => {
+      if (e.candidate) ws.send(JSON.stringify({ type:'ice-candidate', candidate:e.candidate }));
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        document.getElementById('gReconnectOverlay').classList.add('show');
+        document.getElementById('gReconnectMsg').textContent='Conexión perdida...';
+        setGConn('disconnected','Reconectando...');
+      }
+      if (pc.connectionState === 'connected') {
+        document.getElementById('gReconnectOverlay').classList.remove('show');
+        setGConn('connected','Conectado');
+      }
+    };
+    return pc;
+  }
+
+  async function gStartCall() { peerConn=createGuestPeer(); const o=await peerConn.createOffer(); await peerConn.setLocalDescription(o); ws.send(JSON.stringify({type:'offer',sdp:peerConn.localDescription})); }
+  async function gHandleOffer(sdp) { peerConn=createGuestPeer(); await peerConn.setRemoteDescription(new RTCSessionDescription(sdp)); const a=await peerConn.createAnswer(); await peerConn.setLocalDescription(a); ws.send(JSON.stringify({type:'answer',sdp:peerConn.localDescription})); }
+  async function gHandleAnswer(sdp) { await peerConn?.setRemoteDescription(new RTCSessionDescription(sdp)); }
+  async function gHandleIce(c) { try { await peerConn?.addIceCandidate(new RTCIceCandidate(c)); } catch {} }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  document.getElementById('gBtnMic').addEventListener('click', () => {
+    micOn = !micOn;
+    localStream?.getAudioTracks().forEach(t=>t.enabled=micOn);
+    document.getElementById('gBtnMic').textContent = micOn ? '🎤' : '🔇';
+    document.getElementById('gBtnMic').classList.toggle('active', !micOn);
+  });
+  document.getElementById('gBtnCam').addEventListener('click', () => {
+    camOn = !camOn;
+    localStream?.getVideoTracks().forEach(t=>t.enabled=camOn);
+    document.getElementById('gBtnCam').textContent = camOn ? '📹' : '🚫';
+    document.getElementById('gBtnCam').classList.toggle('active', !camOn);
+  });
+  document.getElementById('gBtnEnd').addEventListener('click', async () => {
+    if (!confirm('¿Desea finalizar la visita?')) return;
+    try { await API.session.guestEnd(guestToken); } catch {}
+    ws?.send(JSON.stringify({type:'leave'}));
+    ws?.close();
+    localStream?.getTracks().forEach(t=>t.stop());
+    peerConn?.close();
+    stopGTimer();
+    document.getElementById('guestCallPage').style.display='none';
+    document.getElementById('preCallPage').style.display='flex';
+    showAlert('success','La visita ha finalizado. Puede cerrar esta ventana.');
+    document.getElementById('step1').classList.remove('active');
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step3').classList.remove('active');
+  });
+
+  // ── Timer ─────────────────────────────────────────────────────────────────
+  function startGTimer() { if(timerInterval) return; timerInterval=setInterval(()=>{ timerSeconds++; const m=String(Math.floor(timerSeconds/60)).padStart(2,'0'); const s=String(timerSeconds%60).padStart(2,'0'); document.getElementById('gTimer').textContent=`${m}:${s}`; },1000); }
+  function stopGTimer() { clearInterval(timerInterval); timerInterval=null; }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function goStep(stepId) {
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    document.getElementById(stepId)?.classList.add('active');
+  }
+  function showAlert(type, msg) {
+    const el = document.getElementById('mainAlert');
+    el.className = type ? `alert alert-${type} show` : 'alert';
+    el.textContent = msg;
+  }
+  function setGConn(state, label) {
+    document.getElementById('gConnDot').className='connection-dot '+(state==='connected'?'':'disconnected');
+    document.getElementById('gConnLabel').textContent=label;
+  }
+</script>
+</body>
+</html>

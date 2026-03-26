@@ -1,18 +1,26 @@
 {
-  "name": "homepty",
-  "version": "1.0.0",
-  "description": "Aplicación web de entrevistas 1 a 1 con videollamada WebRTC y servidor de señalización minimalista.",
+  "name": "pradsa-virtual",
+  "version": "2.0.0",
+  "description": "Pradsa Virtual – Plataforma segura de videollamadas para entrevistas de crédito (ISO 27001:2022)",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
-  "keywords": [
-    "webrtc",
-    "video",
-    "interview",
-    "signaling"
-  ],
-  "author": "",
-  "license": "MIT",
-  "type": "commonjs"
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
 }

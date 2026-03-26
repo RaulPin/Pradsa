@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pradsa Virtual – Entrevista</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .guest-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px; font-size: .78rem; font-weight: 600;
+    }
+    .guest-waiting  { background: rgba(234,179,8,.2); color: #fbbf24; }
+    .guest-connected{ background: rgba(34,197,94,.2); color: #4ade80; }
+    .guest-left     { background: rgba(239,68,68,.2); color: #f87171; }
+    .photo-capture-btn { font-size: .85rem; }
+    #captureCanvas { display: none; }
+  </style>
+</head>
+<body>
+<div class="video-shell">
+  <!-- Topbar -->
+  <div class="video-topbar">
+    <div class="interview-info">
+      <strong id="infoName">Cargando...</strong>
+      <span id="infoType"></span> · <span id="infoAddress"></span>
+    </div>
+    <div class="flex gap-3" style="align-items:center">
+      <span id="guestStatusBadge" class="guest-status guest-waiting">⏳ Esperando invitado</span>
+      <div class="connection-status">
+        <div class="connection-dot disconnected" id="connDot"></div>
+        <span id="connLabel">Desconectado</span>
+      </div>
+      <span class="call-timer" id="timer">00:00</span>
+      <a href="/dashboard" class="btn btn-secondary btn-sm">← Volver</a>
+    </div>
+  </div>
+
+  <!-- Video area -->
+  <div class="video-area">
+    <div class="video-main" style="position:relative">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <video id="localVideo" autoplay playsinline muted></video>
+      <canvas id="captureCanvas"></canvas>
+      <!-- Reconnect overlay -->
+      <div class="reconnect-overlay" id="reconnectOverlay">
+        <div class="spinner"></div>
+        <span id="reconnectMsg">Reconectando...</span>
+      </div>
+      <!-- Waiting for guest overlay -->
+      <div class="reconnect-overlay" id="waitingOverlay" style="display:flex">
+        <div class="spinner"></div>
+        <span>Esperando que el entrevistado se conecte...</span>
+        <small style="color:#94a3b8;font-size:.82rem" id="waitingToken"></small>
+      </div>
+    </div>
+
+    <!-- Side panel -->
+    <div class="video-side">
+      <div class="video-side-tabs">
+        <button class="tab-btn active" data-tab="questionnaire">📝 Cuestionario</button>
+        <button class="tab-btn" data-tab="photos">📷 Fotos (<span id="photoCount">0</span>)</button>
+        <button class="tab-btn" data-tab="notes">📌 Notas</button>
+      </div>
+
+      <!-- Questionnaire tab -->
+      <div class="tab-panel active" id="tab-questionnaire">
+        <div id="questionnaireContainer">
+          <p class="text-muted" style="font-size:.85rem">Seleccione el tipo de crédito para cargar el formulario.</p>
+        </div>
+        <div class="mt-3">
+          <button class="btn btn-success btn-sm w-full" id="saveQuestionnaireBtn" style="display:none">💾 Guardar respuestas</button>
+        </div>
+      </div>
+
+      <!-- Photos tab -->
+      <div class="tab-panel" id="tab-photos">
+        <button class="btn btn-primary btn-sm w-full photo-capture-btn mb-4" id="capturePhotoBtn">📷 Capturar foto</button>
+        <div class="photos-grid" id="photosGrid"></div>
+      </div>
+
+      <!-- Notes tab -->
+      <div class="tab-panel" id="tab-notes">
+        <textarea id="notesArea" style="width:100%;height:calc(100% - 50px);background:#0d1117;color:#e6edf3;border-color:#30363d;font-size:.85rem" placeholder="Notas del analista..."></textarea>
+        <button class="btn btn-secondary btn-sm w-full mt-2" id="saveNotesBtn">Guardar notas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="video-controls">
+    <button class="btn-icon" id="btnMic" title="Silenciar micrófono">🎤</button>
+    <button class="btn-icon" id="btnCam" title="Pausar cámara">📹</button>
+    <button class="btn-icon" id="btnScreen" title="Compartir pantalla">🖥</button>
+    <button class="btn-icon danger" id="btnEnd" title="Finalizar entrevista">📵</button>
+    <button class="btn btn-success btn-sm photo-capture-btn" id="capturePhotoBtn2">📷 Foto</button>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+// ── PYME & Fiduciario questionnaire definitions ─────────────────────────────
+const QUESTIONNAIRES = {
+  pyme: [
+    { section: 'Datos del Negocio', questions: [
+      { key:'biz_name',    text:'Nombre del Negocio / Razón Social' },
+      { key:'biz_tax_id',  text:'NIT / RUC / Registro Tributario' },
+      { key:'biz_type',    text:'Tipo de Sociedad / Persona' },
+      { key:'biz_activity',text:'Actividad Económica Principal' },
+      { key:'biz_sector',  text:'Sector (Comercio / Manufactura / Servicios / Agro)' },
+      { key:'biz_years',   text:'Años de Operación' },
+      { key:'biz_employees',text:'Número de Empleados' },
+      { key:'biz_address', text:'Dirección del Negocio (confirmada en visita)' },
+    ]},
+    { section: 'Información Financiera', questions: [
+      { key:'fin_monthly_income',  text:'Ingresos Mensuales Promedio (últimos 3 meses)' },
+      { key:'fin_monthly_expenses',text:'Egresos Mensuales Promedio' },
+      { key:'fin_total_assets',    text:'Activos Totales (estimado)' },
+      { key:'fin_total_liabilities',text:'Pasivos Totales (estimado)' },
+      { key:'fin_inventory',       text:'Valor Aproximado del Inventario' },
+      { key:'fin_receivables',     text:'Cuentas por Cobrar Aproximadas' },
+    ]},
+    { section: 'Operación Comercial', questions: [
+      { key:'op_products',   text:'Principales Productos / Servicios Ofrecidos' },
+      { key:'op_clients',    text:'Principales Clientes (Top 3)' },
+      { key:'op_suppliers',  text:'Principales Proveedores (Top 3)' },
+      { key:'op_sales_cycle',text:'Ciclo de Ventas (diario / semanal / mensual)' },
+      { key:'op_seasonality',text:'¿Existe Estacionalidad? Describa.' },
+    ]},
+    { section: 'Solicitud de Crédito', questions: [
+      { key:'loan_amount',  text:'Monto del Crédito Solicitado' },
+      { key:'loan_purpose', text:'Destino del Crédito' },
+      { key:'loan_term',    text:'Plazo Solicitado (meses)' },
+      { key:'loan_collateral', text:'Garantías Disponibles' },
+      { key:'loan_history', text:'Historial Crediticio (entidades, montos, situación)' },
+      { key:'loan_references',text:'Referencias Comerciales o Bancarias' },
+    ]},
+    { section: 'Observaciones', questions: [
+      { key:'obs_analyst',  text:'Observaciones del Analista', type:'textarea' },
+      { key:'obs_conditions',text:'Condiciones del Negocio Observadas (infraestructura, inventario, etc.)', type:'textarea' },
+    ]},
+  ],
+  fiduciario: [
+    { section: 'Datos del Fideicomitente', questions: [
+      { key:'t_full_name',   text:'Nombre Completo' },
+      { key:'t_id_doc',      text:'Documento de Identidad / Pasaporte' },
+      { key:'t_birth_date',  text:'Fecha de Nacimiento' },
+      { key:'t_marital',     text:'Estado Civil' },
+      { key:'t_nationality', text:'Nacionalidad' },
+      { key:'t_occupation',  text:'Ocupación / Profesión' },
+      { key:'t_employer',    text:'Empleador / Empresa (si aplica)' },
+      { key:'t_address',     text:'Dirección de Residencia (confirmada en visita)' },
+      { key:'t_phone',       text:'Teléfono de Contacto' },
+      { key:'t_email',       text:'Correo Electrónico' },
+    ]},
+    { section: 'Situación Financiera', questions: [
+      { key:'f_monthly_income',   text:'Ingresos Mensuales' },
+      { key:'f_monthly_expenses', text:'Egresos Mensuales' },
+      { key:'f_total_assets',     text:'Activos Totales' },
+      { key:'f_total_liabilities',text:'Pasivos Totales' },
+      { key:'f_origin_of_funds',  text:'Origen de los Fondos / Patrimonio' },
+      { key:'f_other_trusts',     text:'¿Tiene otros Fideicomisos activos? Detalle.' },
+    ]},
+    { section: 'Beneficiarios', questions: [
+      { key:'b_bene1', text:'Beneficiario 1 (Nombre, Parentesco, % Participación)' },
+      { key:'b_bene2', text:'Beneficiario 2 (Nombre, Parentesco, % Participación)' },
+      { key:'b_bene3', text:'Beneficiario 3 (Nombre, Parentesco, % Participación)' },
+      { key:'b_legal_rep', text:'Representante Legal (si aplica)' },
+    ]},
+    { section: 'Fideicomiso', questions: [
+      { key:'tr_purpose',   text:'Propósito / Objeto del Fideicomiso' },
+      { key:'tr_assets',    text:'Bienes a Fideicomisar (descripción detallada)' },
+      { key:'tr_asset_val', text:'Valor Estimado de los Bienes' },
+      { key:'tr_term',      text:'Plazo del Fideicomiso (años / indefinido)' },
+      { key:'tr_conditions',text:'Condiciones Especiales o Cláusulas Particulares', type:'textarea' },
+      { key:'tr_trustee',   text:'Fiduciario Propuesto (institución)' },
+    ]},
+    { section: 'Observaciones', questions: [
+      { key:'obs_analyst', text:'Observaciones del Analista', type:'textarea' },
+      { key:'obs_property',text:'Condiciones del Inmueble / Bienes Observados', type:'textarea' },
+    ]},
+  ],
+};
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+if (!API.requireAuth()) throw 'Not auth';
+
+const params    = new URLSearchParams(location.search);
+const interviewId = params.get('id');
+const viewOnly  = params.get('view') === '1';
+if (!interviewId) { window.location.href='/dashboard'; }
+
+let interview   = null;
+let localStream = null;
+let peerConn    = null;
+let ws          = null;
+let wsRetry     = 0;
+let timerInterval = null;
+let timerSeconds  = 0;
+let micOn = true, camOn = true;
+let photoList = [];
+
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
+
+async function init() {
+  try {
+    interview = await API.interviews.get(interviewId);
+  } catch(e) { alert('No se pudo cargar la entrevista.'); window.location.href='/dashboard'; return; }
+
+  document.getElementById('infoName').textContent = interview.interviewee_name;
+  document.getElementById('infoType').textContent = interview.interview_type.toUpperCase();
+  document.getElementById('infoAddress').textContent = interview.declared_address;
+  document.getElementById('waitingToken').textContent = `Enlace: ${location.origin}/guest?token=${interview.guest_token}`;
+
+  // Load questionnaire
+  loadQuestionnaire(interview.interview_type, interview.questionnaire || []);
+
+  // Load existing photos
+  if (interview.photos) {
+    interview.photos.forEach(p => addPhotoToGrid(`/api/session/photos/${p.filename}`, p.id));
+  }
+
+  // Load existing notes
+  document.getElementById('notesArea').value = interview.notes || '';
+
+  if (viewOnly || interview.status === 'completed') {
+    showViewOnlyMode();
+    return;
+  }
+
+  // Start camera
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('localVideo').srcObject = localStream;
+  } catch(e) {
+    alert('No se pudo acceder a cámara/micrófono: ' + e.message);
+  }
+
+  connectWS();
+}
+
+// ── Questionnaire ─────────────────────────────────────────────────────────────
+function loadQuestionnaire(type, existing) {
+  const def = QUESTIONNAIRES[type];
+  if (!def) return;
+  const existingMap = {};
+  (existing || []).forEach(a => existingMap[a.question_key] = a.answer);
+
+  const container = document.getElementById('questionnaireContainer');
+  container.innerHTML = def.map(sec => `
+    <div class="questionnaire-section">
+      <h4>${esc(sec.section)}</h4>
+      ${sec.questions.map(q => `
+        <div class="q-item">
+          <label>${esc(q.text)}</label>
+          ${q.type === 'textarea'
+            ? `<textarea name="${q.key}" rows="2">${esc(existingMap[q.key]||'')}</textarea>`
+            : `<input type="text" name="${q.key}" value="${esc(existingMap[q.key]||'')}" placeholder="—">`}
+        </div>`).join('')}
+    </div>`).join('');
+
+  document.getElementById('saveQuestionnaireBtn').style.display = 'block';
+}
+
+document.getElementById('saveQuestionnaireBtn').addEventListener('click', saveQuestionnaire);
+
+async function saveQuestionnaire() {
+  const type = interview?.interview_type;
+  const def  = QUESTIONNAIRES[type];
+  if (!def) return;
+  const btn = document.getElementById('saveQuestionnaireBtn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  const answers = [];
+  def.forEach(sec => {
+    sec.questions.forEach(q => {
+      const el = document.querySelector(`[name="${q.key}"]`);
+      answers.push({ section: sec.section, questionKey: q.key, questionText: q.text, answer: el?.value || null });
+    });
+  });
+
+  try {
+    await API.session.saveQuestionnaire(interviewId, answers);
+    btn.textContent = '✓ Guardado';
+    setTimeout(() => { btn.disabled=false; btn.textContent='💾 Guardar respuestas'; }, 2000);
+  } catch(e) {
+    alert('Error al guardar: ' + e.message);
+    btn.disabled=false; btn.textContent='💾 Guardar respuestas';
+  }
+}
+
+// ── Photos ────────────────────────────────────────────────────────────────────
+function addPhotoToGrid(src, id) {
+  const grid = document.getElementById('photosGrid');
+  const img = document.createElement('img');
+  img.src = src; img.title = `Foto ${photoList.length+1}`;
+  img.onclick = () => window.open(src, '_blank');
+  grid.appendChild(img);
+  photoList.push(id);
+  document.getElementById('photoCount').textContent = photoList.length;
+}
+
+async function capturePhoto() {
+  if (!localStream && !document.getElementById('remoteVideo').srcObject) {
+    alert('No hay video activo para capturar.'); return;
+  }
+  const video = document.getElementById('remoteVideo').srcObject
+    ? document.getElementById('remoteVideo')
+    : document.getElementById('localVideo');
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(async (blob) => {
+    try {
+      const ts = new Date().toISOString().replace(/[:.]/g,'-');
+      const res = await API.session.uploadPhoto(interviewId, blob, `foto_${ts}.jpg`);
+      addPhotoToGrid(`/api/session/photos/${res.filename}`, res.id);
+    } catch(e) { alert('Error al guardar foto: '+e.message); }
+  }, 'image/jpeg', 0.85);
+}
+
+document.getElementById('capturePhotoBtn').addEventListener('click', capturePhoto);
+document.getElementById('capturePhotoBtn2').addEventListener('click', capturePhoto);
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+document.getElementById('saveNotesBtn').addEventListener('click', async () => {
+  try {
+    await API.interviews.update(interviewId, { notes: document.getElementById('notesArea').value });
+    document.getElementById('saveNotesBtn').textContent = '✓ Guardado';
+    setTimeout(() => { document.getElementById('saveNotesBtn').textContent='Guardar notas'; }, 1500);
+  } catch(e) { alert(e.message); }
+});
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+  ws.onopen = () => {
+    wsRetry = 0;
+    const type = wsRetry > 0 ? 'reconnect' : 'join';
+    ws.send(JSON.stringify({ type, roomCode: interview.room_code, role: 'interviewer' }));
+    setConn('connecting', 'Conectando...');
+  };
+
+  ws.onmessage = async (e) => {
+    const msg = JSON.parse(e.data);
+    switch (msg.type) {
+      case 'joined':
+        setConn('connecting', 'Esperando invitado...');
+        break;
+      case 'ready':
+        document.getElementById('waitingOverlay').style.display='none';
+        setConn('connected', 'Conectado');
+        updateGuestStatus('connected');
+        if (msg.initiator) await startCall();
+        break;
+      case 'offer':
+        await handleOffer(msg.sdp);
+        break;
+      case 'answer':
+        await handleAnswer(msg.sdp);
+        break;
+      case 'ice-candidate':
+        await handleIce(msg.candidate);
+        break;
+      case 'peer-left':
+        updateGuestStatus('left');
+        setConn('disconnected','Invitado desconectado');
+        stopTimer();
+        document.getElementById('waitingOverlay').style.display='flex';
+        break;
+      case 'peer-reconnected':
+        updateGuestStatus('connected');
+        break;
+      case 'error':
+        console.warn('[WS]', msg.message);
+        break;
+    }
+  };
+
+  ws.onclose = () => {
+    setConn('disconnected','Desconectado');
+    scheduleWsReconnect();
+  };
+  ws.onerror = () => {
+    setConn('disconnected','Error de conexión');
+  };
+}
+
+function scheduleWsReconnect() {
+  if (interview?.status === 'completed') return;
+  const delay = Math.min(1000 * Math.pow(2, wsRetry), 30000);
+  wsRetry++;
+  showReconnecting(true, `Reconectando en ${Math.round(delay/1000)}s...`);
+  setTimeout(() => {
+    showReconnecting(true, 'Reconectando...');
+    connectWS();
+  }, delay);
+}
+
+function showReconnecting(show, msg='') {
+  const ov = document.getElementById('reconnectOverlay');
+  ov.classList.toggle('show', show);
+  if (msg) document.getElementById('reconnectMsg').textContent = msg;
+}
+
+// ── WebRTC ────────────────────────────────────────────────────────────────────
+function createPeer() {
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  pc.ontrack = (e) => {
+    document.getElementById('remoteVideo').srcObject = e.streams[0];
+    showReconnecting(false);
+    startTimer();
+    try { API.session.start(interviewId); } catch {}
+  };
+  pc.onicecandidate = (e) => {
+    if (e.candidate) ws.send(JSON.stringify({ type:'ice-candidate', candidate: e.candidate }));
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      showReconnecting(true, 'Conexión perdida – reconectando...');
+      setConn('disconnected','Reconectando...');
+    }
+    if (pc.connectionState === 'connected') {
+      showReconnecting(false);
+      setConn('connected','Conectado');
+    }
+  };
+  return pc;
+}
+
+async function startCall() {
+  peerConn = createPeer();
+  const offer = await peerConn.createOffer();
+  await peerConn.setLocalDescription(offer);
+  ws.send(JSON.stringify({ type:'offer', sdp: peerConn.localDescription }));
+}
+
+async function handleOffer(sdp) {
+  peerConn = createPeer();
+  await peerConn.setRemoteDescription(new RTCSessionDescription(sdp));
+  const answer = await peerConn.createAnswer();
+  await peerConn.setLocalDescription(answer);
+  ws.send(JSON.stringify({ type:'answer', sdp: peerConn.localDescription }));
+}
+
+async function handleAnswer(sdp) {
+  await peerConn?.setRemoteDescription(new RTCSessionDescription(sdp));
+}
+
+async function handleIce(candidate) {
+  try { await peerConn?.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+document.getElementById('btnMic').addEventListener('click', () => {
+  micOn = !micOn;
+  localStream?.getAudioTracks().forEach(t => t.enabled = micOn);
+  document.getElementById('btnMic').textContent = micOn ? '🎤' : '🔇';
+  document.getElementById('btnMic').classList.toggle('active', !micOn);
+});
+
+document.getElementById('btnCam').addEventListener('click', () => {
+  camOn = !camOn;
+  localStream?.getVideoTracks().forEach(t => t.enabled = camOn);
+  document.getElementById('btnCam').textContent = camOn ? '📹' : '🚫';
+  document.getElementById('btnCam').classList.toggle('active', !camOn);
+});
+
+document.getElementById('btnScreen').addEventListener('click', async () => {
+  try {
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const screenTrack  = screenStream.getVideoTracks()[0];
+    const sender = peerConn?.getSenders().find(s => s.track?.kind === 'video');
+    if (sender) sender.replaceTrack(screenTrack);
+    screenTrack.onended = () => {
+      const camTrack = localStream?.getVideoTracks()[0];
+      if (sender && camTrack) sender.replaceTrack(camTrack);
+    };
+  } catch(e) { console.warn('Screen share cancelled'); }
+});
+
+document.getElementById('btnEnd').addEventListener('click', async () => {
+  if (!confirm('¿Finalizar la entrevista?')) return;
+  await saveQuestionnaire();
+  try { await API.session.end(interviewId); } catch {}
+  ws?.send(JSON.stringify({ type:'leave' }));
+  ws?.close();
+  localStream?.getTracks().forEach(t => t.stop());
+  peerConn?.close();
+  stopTimer();
+  window.location.href = `/interview?id=${interviewId}&view=1`;
+});
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+function startTimer() {
+  if (timerInterval) return;
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    const m = String(Math.floor(timerSeconds/60)).padStart(2,'0');
+    const s = String(timerSeconds%60).padStart(2,'0');
+    document.getElementById('timer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setConn(state, label) {
+  const dot = document.getElementById('connDot');
+  dot.className = 'connection-dot ' + (state==='connected'?'':'disconnected');
+  document.getElementById('connLabel').textContent = label;
+}
+
+function updateGuestStatus(state) {
+  const badge = document.getElementById('guestStatusBadge');
+  if (state==='connected') { badge.className='guest-status guest-connected'; badge.textContent='● Invitado conectado'; }
+  else if (state==='left') { badge.className='guest-status guest-left'; badge.textContent='✗ Invitado desconectado'; }
+  else { badge.className='guest-status guest-waiting'; badge.textContent='⏳ Esperando invitado'; }
+}
+
+function showViewOnlyMode() {
+  document.querySelector('.video-controls').innerHTML = '<a href="/dashboard" class="btn btn-secondary">← Volver al panel</a>';
+  document.getElementById('waitingOverlay').style.display='none';
+  document.querySelectorAll('input,select,textarea').forEach(el => el.setAttribute('disabled',''));
+  document.getElementById('saveQuestionnaireBtn').style.display='none';
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`)?.classList.add('active');
+  });
+});
+
+init();
+</script>
+</body>
+</html>

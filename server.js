@@ -1,342 +1,208 @@
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
-const crypto = require('node:crypto');
+'use strict';
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
-const PORT = process.env.PORT || 3000;
+require('dotenv').config();
 
-const server = http.createServer((req, res) => {
-  if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'text/plain' });
-    res.end('Method Not Allowed');
-    return;
-  }
+const express = require('express');
+const helmet  = require('helmet');
+const cors    = require('cors');
+const rateLimit = require('express-rate-limit');
+const path    = require('path');
+const http    = require('http');
+const { WebSocketServer } = require('ws');
+const crypto  = require('crypto');
 
-  const sanitizedPath = path.normalize(req.url.split('?')[0]).replace(/^\.\./, '');
-  let filePath = path.join(PUBLIC_DIR, sanitizedPath);
+const app    = express();
+const server = http.createServer(app);
 
-  if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain' });
-    res.end('Forbidden');
-    return;
-  }
+// ── Security middleware ───────────────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'"],
+      styleSrc:   ["'self'", "'unsafe-inline'"],
+      imgSrc:     ["'self'", 'data:', 'blob:'],
+      mediaSrc:   ["'self'", 'blob:'],
+      connectSrc: ["'self'", 'wss:', 'ws:'],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+app.use(cors({ origin: false }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false }));
 
-  const stat = fs.statSync(filePath, { throwIfNoEntry: false });
-  if (stat?.isDirectory()) {
-    filePath = path.join(filePath, 'index.html');
-  }
+// ── Rate limiters ─────────────────────────────────────────────────────────────
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Demasiadas solicitudes. Intente en 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/', apiLimiter);
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(err.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain' });
-      res.end(err.code === 'ENOENT' ? 'Not Found' : 'Server Error');
-      return;
-    }
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/auth',       require('./routes/auth'));
+app.use('/api/admin',      require('./routes/admin'));
+app.use('/api/interviews', require('./routes/interviews'));
+app.use('/api/session',    require('./routes/session'));
 
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes = {
-      '.html': 'text/html',
-      '.css': 'text/css',
-      '.js': 'application/javascript',
-      '.json': 'application/json',
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.svg': 'image/svg+xml',
-    };
+// ── Static files ──────────────────────────────────────────────────────────────
+const PUBLIC = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC, { index: false }));
 
-    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-    res.end(data);
-  });
+const pages = ['login', 'dashboard', 'admin', 'interview', 'guest'];
+pages.forEach(p => {
+  app.get(`/${p}`, (req, res) => res.sendFile(path.join(PUBLIC, `${p}.html`)));
+  app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(PUBLIC, `${p}.html`)));
 });
 
-const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-let nextClientId = 1;
+app.get('/', (req, res) => res.redirect('/login'));
+
+app.use((req, res) => res.status(404).json({ error: 'Recurso no encontrado.' }));
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  console.error('[ERROR]', err.message);
+  res.status(err.status || 500).json({ error: err.message || 'Error interno del servidor.' });
+});
+
+// ── WebSocket Signaling ───────────────────────────────────────────────────────
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+/** rooms: Map<roomCode, Set<{ws, role, peerId}>> */
 const rooms = new Map();
+const ROOM_TTL_MS = 30 * 60 * 1000;
 
-server.on('upgrade', (req, socket) => {
-  if (req.headers['upgrade'] !== 'websocket') {
-    socket.destroy();
-    return;
+function getRoomCode(ws) {
+  for (const [code, members] of rooms) {
+    for (const m of members) { if (m.ws === ws) return code; }
   }
+  return null;
+}
 
-  if (!req.url.startsWith('/signal')) {
-    socket.destroy();
-    return;
+function broadcast(roomCode, data, excludeWs = null) {
+  const members = rooms.get(roomCode);
+  if (!members) return;
+  const msg = JSON.stringify(data);
+  for (const m of members) {
+    if (m.ws !== excludeWs && m.ws.readyState === m.ws.OPEN) m.ws.send(msg);
   }
+}
 
-  const acceptKey = req.headers['sec-websocket-key'];
-  if (!acceptKey) {
-    socket.destroy();
-    return;
-  }
+wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
-  const hash = crypto.createHash('sha1').update(acceptKey + GUID).digest('base64');
-  const responseHeaders = [
-    'HTTP/1.1 101 Switching Protocols',
-    'Upgrade: websocket',
-    'Connection: Upgrade',
-    `Sec-WebSocket-Accept: ${hash}`,
-  ];
+  ws.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
 
-  socket.write(responseHeaders.concat('\r\n').join('\r\n'));
-
-  const client = {
-    id: `client-${nextClientId++}`,
-    socket,
-    roomId: null,
-    buffer: Buffer.alloc(0),
-  };
-
-  socket.on('data', (chunk) => handleFrameData(client, chunk));
-  socket.on('close', () => removeClient(client));
-  socket.on('end', () => removeClient(client));
-  socket.on('error', () => removeClient(client));
-});
-
-function handleFrameData(client, chunk) {
-  client.buffer = Buffer.concat([client.buffer, chunk]);
-
-  while (client.buffer.length >= 2) {
-    const firstByte = client.buffer[0];
-    const secondByte = client.buffer[1];
-    const fin = Boolean(firstByte & 0x80);
-    const opcode = firstByte & 0x0f;
-    const masked = Boolean(secondByte & 0x80);
-    let payloadLength = secondByte & 0x7f;
-    let offset = 2;
-
-    if (!fin) {
-      closeSocket(client.socket, 1003);
-      return;
-    }
-
-    if (payloadLength === 126) {
-      if (client.buffer.length < offset + 2) {
-        return;
+    switch (msg.type) {
+      case 'join': {
+        const { roomCode, role } = msg;
+        if (!roomCode || !role) return;
+        if (!rooms.has(roomCode)) rooms.set(roomCode, new Set());
+        const members = rooms.get(roomCode);
+        if (members.size >= 2) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Sala llena.' }));
+          return;
+        }
+        const peerId = crypto.randomBytes(4).toString('hex');
+        members.add({ ws, role, peerId });
+        ws.send(JSON.stringify({ type: 'joined', roomCode, peerId, membersCount: members.size }));
+        if (members.size === 2) {
+          for (const m of members) {
+            m.ws.send(JSON.stringify({ type: 'ready', initiator: m.role === 'interviewer' }));
+          }
+        }
+        break;
       }
-      payloadLength = client.buffer.readUInt16BE(offset);
-      offset += 2;
-    } else if (payloadLength === 127) {
-      if (client.buffer.length < offset + 8) {
-        return;
+      case 'offer':
+      case 'answer':
+      case 'ice-candidate':
+        broadcast(getRoomCode(ws), msg, ws);
+        break;
+
+      case 'leave':
+        handleLeave(ws);
+        break;
+
+      case 'reconnect': {
+        const { roomCode, role } = msg;
+        if (!roomCode) return;
+        if (!rooms.has(roomCode)) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Sesión expirada.' }));
+          return;
+        }
+        const members = rooms.get(roomCode);
+        for (const m of [...members]) {
+          if (m.role === role && m.ws.readyState !== m.ws.OPEN) members.delete(m);
+        }
+        if (members.size >= 2) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Sala llena.' }));
+          return;
+        }
+        const peerId = crypto.randomBytes(4).toString('hex');
+        members.add({ ws, role, peerId });
+        ws.send(JSON.stringify({ type: 'joined', roomCode, peerId, membersCount: members.size, reconnected: true }));
+        broadcast(roomCode, { type: 'peer-reconnected', role }, ws);
+        if (members.size === 2) {
+          for (const m of members) {
+            m.ws.send(JSON.stringify({ type: 'ready', initiator: m.role === 'interviewer', reconnect: true }));
+          }
+        }
+        break;
       }
-      const high = client.buffer.readUInt32BE(offset);
-      const low = client.buffer.readUInt32BE(offset + 4);
-      if (high !== 0) {
-        closeSocket(client.socket, 1009);
-        return;
+
+      case 'chat': {
+        const roomCode = getRoomCode(ws);
+        if (roomCode) broadcast(roomCode, { type: 'chat', text: msg.text, from: msg.from }, ws);
+        break;
       }
-      payloadLength = low;
-      offset += 8;
-    }
 
-    if (!masked) {
-      closeSocket(client.socket, 1002);
-      return;
-    }
-
-    if (client.buffer.length < offset + 4) {
-      return;
-    }
-
-    const mask = client.buffer.slice(offset, offset + 4);
-    offset += 4;
-
-    if (client.buffer.length < offset + payloadLength) {
-      return;
-    }
-
-    const payload = client.buffer.slice(offset, offset + payloadLength);
-    const unmasked = Buffer.alloc(payloadLength);
-    for (let i = 0; i < payloadLength; i += 1) {
-      unmasked[i] = payload[i] ^ mask[i % 4];
-    }
-
-    client.buffer = client.buffer.slice(offset + payloadLength);
-
-    if (opcode === 0x1) {
-      const text = unmasked.toString('utf8');
-      handleClientMessage(client, text);
-    } else if (opcode === 0x8) {
-      closeSocket(client.socket, 1000, false);
-      return;
-    } else if (opcode === 0x9) {
-      // ping
-      sendFrame(client.socket, unmasked, 0xA);
-    } else {
-      closeSocket(client.socket, 1003);
-      return;
-    }
-  }
-}
-
-function buildFrame(payload, opcode = 0x1) {
-  const payloadLength = payload.length;
-  let frame;
-
-  if (payloadLength < 126) {
-    frame = Buffer.alloc(2 + payloadLength);
-    frame[0] = 0x80 | opcode;
-    frame[1] = payloadLength;
-    payload.copy(frame, 2);
-  } else if (payloadLength < 65536) {
-    frame = Buffer.alloc(4 + payloadLength);
-    frame[0] = 0x80 | opcode;
-    frame[1] = 126;
-    frame.writeUInt16BE(payloadLength, 2);
-    payload.copy(frame, 4);
-  } else {
-    frame = Buffer.alloc(10 + payloadLength);
-    frame[0] = 0x80 | opcode;
-    frame[1] = 127;
-    frame.writeUInt32BE(0, 2);
-    frame.writeUInt32BE(payloadLength, 6);
-    payload.copy(frame, 10);
-  }
-
-  return frame;
-}
-
-function sendFrame(socket, data, opcode = 0x1) {
-  if (socket.destroyed) {
-    return;
-  }
-  const payload = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
-  const frame = buildFrame(payload, opcode);
-  socket.write(frame);
-}
-
-function closeSocket(socket, code = 1000, notify = true) {
-  if (socket.destroyed) {
-    return;
-  }
-  if (notify) {
-    const buffer = Buffer.alloc(2);
-    buffer.writeUInt16BE(code, 0);
-    const frame = buildFrame(buffer, 0x8);
-    socket.end(frame);
-  } else {
-    socket.end();
-  }
-}
-
-function handleClientMessage(client, text) {
-  let payload;
-  try {
-    payload = JSON.parse(text);
-  } catch (err) {
-    return;
-  }
-
-  switch (payload.type) {
-    case 'join':
-      handleJoin(client, payload);
-      break;
-    case 'offer':
-    case 'answer':
-    case 'ice':
-    case 'leave':
-      forwardToPeer(client, payload);
-      if (payload.type === 'leave') {
-        removeClient(client);
-      }
-      break;
-    default:
-      break;
-  }
-}
-
-function handleJoin(client, payload) {
-  const { roomId } = payload;
-  if (!roomId || typeof roomId !== 'string') {
-    send(client, { type: 'error', message: 'Invalid room identifier.' });
-    return;
-  }
-
-  if (client.roomId) {
-    send(client, { type: 'error', message: 'Client already joined a room.' });
-    return;
-  }
-
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, []);
-  }
-
-  const room = rooms.get(roomId);
-  if (room.length >= 2) {
-    send(client, { type: 'room_full' });
-    return;
-  }
-
-  client.roomId = roomId;
-  room.push(client);
-
-  send(client, { type: 'joined', clientId: client.id });
-
-  if (room.length === 2) {
-    const [first, second] = room;
-    send(first, { type: 'ready', initiator: true, peerId: second.id });
-    send(second, { type: 'ready', initiator: false, peerId: first.id });
-  }
-}
-
-function forwardToPeer(client, payload) {
-  const { roomId } = client;
-  if (!roomId) {
-    return;
-  }
-
-  const room = rooms.get(roomId);
-  if (!room) {
-    return;
-  }
-
-  room.forEach((participant) => {
-    if (participant !== client) {
-      send(participant, { ...payload, from: client.id });
+      default: break;
     }
   });
-}
 
-function removeClient(client) {
-  const { roomId } = client;
-  if (!roomId) {
-    return;
+  ws.on('close', () => handleLeave(ws));
+  ws.on('error', (err) => { console.error('[WS ERROR]', err.message); handleLeave(ws); });
+});
+
+function handleLeave(ws) {
+  const roomCode = getRoomCode(ws);
+  if (!roomCode) return;
+  const members = rooms.get(roomCode);
+  if (!members) return;
+  let leavingRole = null;
+  for (const m of members) {
+    if (m.ws === ws) { leavingRole = m.role; members.delete(m); break; }
   }
-
-  const room = rooms.get(roomId);
-  if (!room) {
-    return;
-  }
-
-  const idx = room.indexOf(client);
-  if (idx !== -1) {
-    room.splice(idx, 1);
-  }
-
-  if (room.length === 0) {
-    rooms.delete(roomId);
-  } else {
-    room.forEach((participant) => {
-      send(participant, { type: 'peer_left', peerId: client.id });
-    });
-  }
-
-  client.roomId = null;
-}
-
-function send(client, payload) {
-  if (!client || !payload) {
-    return;
-  }
-  try {
-    sendFrame(client.socket, JSON.stringify(payload), 0x1);
-  } catch (err) {
-    // ignore write errors
+  broadcast(roomCode, { type: 'peer-left', role: leavingRole });
+  if (members.size === 0) {
+    setTimeout(() => { if (rooms.get(roomCode)?.size === 0) rooms.delete(roomCode); }, ROOM_TTL_MS);
   }
 }
 
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) { ws.terminate(); continue; }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+wss.on('close', () => clearInterval(heartbeat));
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`\nPradsa Virtual corriendo en http://localhost:${PORT}\n`);
 });
