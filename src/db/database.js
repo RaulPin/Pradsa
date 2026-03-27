@@ -1,5 +1,5 @@
 'use strict';
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
@@ -10,12 +10,12 @@ const { generateTempPassword, hashPassword } = require('../utils/password');
 const dbDir = path.dirname(path.resolve(config.dbPath));
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
-const db = new Database(path.resolve(config.dbPath));
+const db = new DatabaseSync(path.resolve(config.dbPath));
 
 // Pragmas de rendimiento y seguridad
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-db.pragma('busy_timeout = 5000');
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
+db.exec('PRAGMA busy_timeout = 5000');
 
 // ─── Esquema de base de datos ────────────────────────────────────────────────
 db.exec(`
