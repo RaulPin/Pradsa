@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EntrevistasPradsa – Acceso</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-mark">EP</div>
+      <div>
+        <div class="logo-name">EntrevistasPradsa</div>
+        <div class="logo-sub">Plataforma de Entrevistas</div>
+      </div>
+    </div>
+
+    <!-- PANTALLA: Login -->
+    <div id="screen-login">
+      <h2 class="auth-title">Iniciar sesión</h2>
+
+      <div id="login-error" class="alert alert-error" hidden></div>
+
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="email">Correo electrónico</label>
+          <input id="email" type="email" autocomplete="username" required placeholder="usuario@empresa.com" />
+        </div>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <div class="input-wrap">
+            <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••••••" />
+            <button type="button" class="toggle-pw" aria-label="Mostrar contraseña" data-target="password">👁</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="btn-login">Acceder</button>
+      </form>
+    </div>
+
+    <!-- PANTALLA: Cambio de contraseña obligatorio (primer ingreso) -->
+    <div id="screen-change-pw" hidden>
+      <div class="alert alert-warning" style="margin-bottom:1.25rem;">
+        <strong>Primer ingreso:</strong> Debes establecer una contraseña nueva y segura antes de continuar.
+      </div>
+      <h2 class="auth-title">Crear contraseña</h2>
+
+      <div id="change-error" class="alert alert-error" hidden></div>
+      <div id="change-success" class="alert alert-success" hidden></div>
+
+      <form id="change-form" novalidate>
+        <div class="field">
+          <label for="current-pw">Contraseña temporal</label>
+          <div class="input-wrap">
+            <input id="current-pw" type="password" autocomplete="current-password" required placeholder="Contraseña que recibiste por correo" />
+            <button type="button" class="toggle-pw" aria-label="Mostrar" data-target="current-pw">👁</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="new-pw">Nueva contraseña</label>
+          <div class="input-wrap">
+            <input id="new-pw" type="password" autocomplete="new-password" required placeholder="Mínimo 12 caracteres" />
+            <button type="button" class="toggle-pw" aria-label="Mostrar" data-target="new-pw">👁</button>
+          </div>
+          <div class="pw-strength" id="pw-strength"></div>
+        </div>
+        <div class="field">
+          <label for="confirm-pw">Confirmar contraseña</label>
+          <div class="input-wrap">
+            <input id="confirm-pw" type="password" autocomplete="new-password" required placeholder="Repite la nueva contraseña" />
+            <button type="button" class="toggle-pw" aria-label="Mostrar" data-target="confirm-pw">👁</button>
+          </div>
+        </div>
+        <div class="pw-rules">
+          <p>Requisitos de contraseña (ISO 27001:2022):</p>
+          <ul>
+            <li id="rule-len">Mínimo 12 caracteres</li>
+            <li id="rule-upper">Al menos una mayúscula</li>
+            <li id="rule-lower">Al menos una minúscula</li>
+            <li id="rule-num">Al menos un número</li>
+            <li id="rule-special">Al menos un carácter especial (@$!%*?&amp;_#^+=)</li>
+          </ul>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="btn-change">Guardar contraseña</button>
+      </form>
+    </div>
+
+    <p class="auth-footer">Conexión segura · ISO 27001:2022</p>
+  </div>
+
+  <script src="/assets/login.js" type="module"></script>
+</body>
+</html>

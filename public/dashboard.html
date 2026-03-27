@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EntrevistasPradsa – Panel</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-mark sm">EP</span>
+      <span class="nav-title">EntrevistasPradsa</span>
+    </div>
+    <div class="nav-user">
+      <span id="nav-name" class="nav-name"></span>
+      <span id="nav-role" class="badge"></span>
+      <button id="btn-logout" class="btn btn-ghost btn-sm">Cerrar sesión</button>
+    </div>
+  </nav>
+
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab active" data-tab="interviews">Entrevistas</button>
+    <button class="tab" data-tab="new-interview">Nueva entrevista</button>
+    <button class="tab admin-only" data-tab="users" hidden>Usuarios</button>
+    <button class="tab admin-only" data-tab="audit" hidden>Auditoría</button>
+  </div>
+
+  <main class="container">
+
+    <!-- ── TAB: Entrevistas ──────────────────────────────────────────── -->
+    <section id="tab-interviews" class="tab-content">
+      <div class="section-header">
+        <h2>Mis entrevistas</h2>
+        <div class="filters">
+          <select id="filter-status">
+            <option value="">Todos los estados</option>
+            <option value="scheduled">Programada</option>
+            <option value="in_progress">En curso</option>
+            <option value="completed">Completada</option>
+            <option value="cancelled">Cancelada</option>
+          </select>
+          <select id="filter-type">
+            <option value="">Todos los tipos</option>
+            <option value="pyme">Pyme</option>
+            <option value="fiduciario">Fiduciario</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Stats (admin) -->
+      <div id="stats-row" class="stats-row admin-only" hidden></div>
+
+      <div id="interviews-list" class="card-grid"></div>
+    </section>
+
+    <!-- ── TAB: Nueva entrevista ──────────────────────────────────────── -->
+    <section id="tab-new-interview" class="tab-content" hidden>
+      <h2>Agendar entrevista</h2>
+
+      <div id="create-error" class="alert alert-error" hidden></div>
+      <div id="create-success" class="alert alert-success" hidden></div>
+
+      <form id="interview-form" class="form-card" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="int-title">Título / referencia *</label>
+            <input id="int-title" type="text" required placeholder="Ej. Crédito Pyme – Juan García" />
+          </div>
+          <div class="field">
+            <label for="int-type">Tipo de entrevista *</label>
+            <select id="int-type" required>
+              <option value="">Selecciona...</option>
+              <option value="pyme">Crédito Pyme</option>
+              <option value="fiduciario">Crédito Fiduciario</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="int-date">Fecha y hora *</label>
+            <input id="int-date" type="datetime-local" required />
+          </div>
+          <div class="field">
+            <label for="int-name">Nombre del entrevistado *</label>
+            <input id="int-name" type="text" required placeholder="Nombre completo" />
+          </div>
+          <div class="field">
+            <label for="int-email">Correo del entrevistado *</label>
+            <input id="int-email" type="email" required placeholder="correo@ejemplo.com" />
+          </div>
+          <div class="field">
+            <label for="int-phone">Teléfono (opcional)</label>
+            <input id="int-phone" type="tel" placeholder="+52 55 0000 0000" />
+          </div>
+          <div class="field field-full">
+            <label for="int-address">Dirección declarada (para verificar ubicación)</label>
+            <input id="int-address" type="text" placeholder="Calle, número, colonia, ciudad" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btn-create">Crear y enviar invitación</button>
+        </div>
+      </form>
+
+      <div id="created-box" class="created-box" hidden>
+        <h3>✅ Entrevista creada</h3>
+        <p>Se envió la invitación al entrevistado por correo. También puedes compartir el enlace directamente:</p>
+        <div class="link-box">
+          <input id="join-link" type="text" readonly />
+          <button class="btn btn-sm" id="btn-copy">Copiar</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-another" style="margin-top:1rem">Agendar otra entrevista</button>
+      </div>
+    </section>
+
+    <!-- ── TAB: Usuarios (admin) ──────────────────────────────────────── -->
+    <section id="tab-users" class="tab-content" hidden>
+      <div class="section-header">
+        <h2>Gestión de usuarios</h2>
+        <button class="btn btn-primary btn-sm" id="btn-show-create-user">+ Nuevo usuario</button>
+      </div>
+
+      <div id="user-form-box" class="form-card" hidden>
+        <h3>Crear usuario</h3>
+        <div id="user-error" class="alert alert-error" hidden></div>
+        <div id="user-success" class="alert alert-success" hidden></div>
+        <form id="user-form" class="form-grid" novalidate>
+          <div class="field">
+            <label for="usr-name">Nombre completo *</label>
+            <input id="usr-name" type="text" required placeholder="Nombre Apellido" />
+          </div>
+          <div class="field">
+            <label for="usr-email">Correo electrónico *</label>
+            <input id="usr-email" type="email" required placeholder="usuario@empresa.com" />
+          </div>
+          <div class="field">
+            <label for="usr-role">Rol *</label>
+            <select id="usr-role">
+              <option value="user">Usuario</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="field field-full form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-save-user">Crear usuario</button>
+            <button type="button" class="btn btn-ghost" id="btn-cancel-user">Cancelar</button>
+          </div>
+        </form>
+        <div id="temp-pw-box" class="alert alert-warning" hidden>
+          <strong>Contraseña temporal (cópiala ahora):</strong><br>
+          <code id="temp-pw-display"></code>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="users-table" class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th>
+              <th>Último ingreso</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── TAB: Auditoría (admin) ─────────────────────────────────────── -->
+    <section id="tab-audit" class="tab-content" hidden>
+      <div class="section-header">
+        <h2>Log de auditoría</h2>
+        <select id="audit-filter">
+          <option value="">Todos los eventos</option>
+          <option value="LOGIN_SUCCESS">Inicios de sesión</option>
+          <option value="LOGIN_FAILED">Intentos fallidos</option>
+          <option value="LOGIN_BLOCKED">Bloqueos</option>
+          <option value="PASSWORD_CHANGED">Cambios de contraseña</option>
+          <option value="USER_CREATED">Usuarios creados</option>
+          <option value="INTERVIEW_CREATED">Entrevistas creadas</option>
+          <option value="PHOTO_CAPTURED">Fotos capturadas</option>
+          <option value="LOCATION_CAPTURED">Ubicaciones capturadas</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Usuario</th><th>Evento</th><th>IP</th><th>Detalles</th>
+            </tr>
+          </thead>
+          <tbody id="audit-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/assets/dashboard.js" type="module"></script>
+</body>
+</html>
