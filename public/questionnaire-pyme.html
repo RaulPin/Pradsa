@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cuestionario Pyme – EntrevistasPradsa</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+  <link rel="stylesheet" href="/assets/questionnaire.css" />
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="navbar-brand">EntrevistasPradsa</span>
+  <span id="q-interview-title" class="navbar-subtitle">Cuestionario Pyme</span>
+  <div class="navbar-actions">
+    <span id="q-status-msg" class="q-status"></span>
+    <button id="btn-save" class="btn btn-ghost btn-sm">💾 Guardar</button>
+    <button id="btn-pdf"  class="btn btn-primary btn-sm">📄 Generar PDF</button>
+  </div>
+</nav>
+
+<div class="q-container" style="max-width:860px;margin:0 auto;padding:1.5rem 1rem 4rem;">
+
+  <!-- ── ENCABEZADO ─────────────────────────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">REPORTE DE VISITA OCULAR – CRÉDITO PYME</div>
+    <div class="q-section-body">
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>ID del cliente</label>
+          <input type="text" name="id_cliente" />
+        </div>
+        <div class="q-field">
+          <label>Monto del crédito solicitado</label>
+          <input type="text" name="monto_credito" placeholder="$" />
+        </div>
+        <div class="q-field">
+          <label>Fecha de la visita</label>
+          <input type="date" name="fecha_visita" />
+        </div>
+        <div class="q-field">
+          <label>Destino del crédito</label>
+          <input type="text" name="destino_credito" value="Capital de Trabajo" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── A: DATOS DEL SOLICITANTE ───────────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">A) DATOS DEL SOLICITANTE DEL CRÉDITO</div>
+    <div class="q-section-body">
+      <div class="q-field q-field-full">
+        <label>Nombre, Razón Social o Denominación Social</label>
+        <input type="text" name="razon_social" />
+      </div>
+      <div class="q-row q-row-3">
+        <div class="q-field">
+          <label>Calle y Número</label>
+          <input type="text" name="calle_numero" />
+        </div>
+        <div class="q-field">
+          <label>Colonia</label>
+          <input type="text" name="colonia" />
+        </div>
+        <div class="q-field">
+          <label>Municipio / Estado</label>
+          <input type="text" name="municipio_estado" />
+        </div>
+      </div>
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>Giro</label>
+          <input type="text" name="giro" />
+        </div>
+        <div class="q-field">
+          <label>Teléfono(s)</label>
+          <input type="text" name="telefonos" />
+        </div>
+        <div class="q-field">
+          <label>RFC</label>
+          <input type="text" name="rfc" />
+        </div>
+        <div class="q-field">
+          <label>Rep. Legal</label>
+          <input type="text" name="rep_legal" />
+        </div>
+      </div>
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>Inmueble</label>
+          <input type="text" name="inmueble" />
+        </div>
+        <div class="q-field">
+          <label>Tipo de zona</label>
+          <select name="tipo_zona">
+            <option value="">Selecciona…</option>
+            <option>Residencial</option>
+            <option>Comercial</option>
+            <option>Industrial</option>
+            <option>Mixta</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>Tipo de inmueble</label>
+          <select name="tipo_inmueble">
+            <option value="">Selecciona…</option>
+            <option>Local comercial</option>
+            <option>Oficina</option>
+            <option>Bodega</option>
+            <option>Fábrica</option>
+            <option>Casa adaptada</option>
+            <option>Casa/Hab</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>Tiempo de residir</label>
+          <input type="text" name="tiempo_residir" placeholder="años" />
+        </div>
+      </div>
+      <div class="q-field" style="max-width:200px;">
+        <label>Tipo de domicilio</label>
+        <select name="tipo_domicilio">
+          <option value="">Selecciona…</option>
+          <option>Fiscal</option>
+          <option>Comercial / Operativo</option>
+          <option>Particular</option>
+          <option>Ambos</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── B: SITUACIÓN DE LA EMPRESA ────────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">B) SITUACIÓN DE LA EMPRESA</div>
+    <div class="q-section-body">
+
+      <!-- Trabajadores -->
+      <div class="q-subsection-title">Los trabajadores cuentan con:</div>
+      <div class="q-row q-row-3" style="max-width:480px;">
+        <div class="q-field">
+          <label>IMSS</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="imss" value="si" /> Sí</label>
+            <label><input type="radio" name="imss" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>INFONAVIT</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="infonavit" value="si" /> Sí</label>
+            <label><input type="radio" name="infonavit" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Sindicato</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="sindicato" value="si" /> Sí</label>
+            <label><input type="radio" name="sindicato" value="no" /> No</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empleados y Sucursales -->
+      <div class="q-row q-row-2" style="margin-top:.75rem;">
+        <div>
+          <div class="q-subsection-title">Empleados</div>
+          <div class="q-row q-row-3">
+            <div class="q-field">
+              <label>Cantidad total</label>
+              <input type="number" name="empleados_total" min="0" />
+            </div>
+            <div class="q-field">
+              <label>Administrativos</label>
+              <input type="number" name="empleados_admin" min="0" />
+            </div>
+            <div class="q-field">
+              <label>Operación</label>
+              <input type="number" name="empleados_operacion" min="0" />
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="q-subsection-title">Sucursales</div>
+          <div class="q-row q-row-2">
+            <div class="q-field">
+              <label>¿Tiene sucursales?</label>
+              <div class="q-radio-inline">
+                <label><input type="radio" name="tiene_sucursales" value="si" /> Sí</label>
+                <label><input type="radio" name="tiene_sucursales" value="no" /> No</label>
+              </div>
+            </div>
+            <div class="q-field">
+              <label>¿Cuántas?</label>
+              <input type="number" name="num_sucursales" min="0" />
+            </div>
+          </div>
+          <div class="q-row q-row-2">
+            <div class="q-field">
+              <label>¿Cuántas operando?</label>
+              <input type="number" name="sucursales_operando" min="0" />
+            </div>
+            <div class="q-field">
+              <label>¿Maquinaria/Insumos?</label>
+              <div class="q-radio-inline">
+                <label><input type="radio" name="tiene_maquinaria" value="si" /> Sí</label>
+                <label><input type="radio" name="tiene_maquinaria" value="no" /> No</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-field q-field-full">
+        <label>Estados o municipios donde tiene sucursales</label>
+        <input type="text" name="estados_sucursales" />
+      </div>
+
+      <!-- Ventas, Clientes, Redes -->
+      <div class="q-row q-row-3" style="margin-top:.75rem;">
+        <div>
+          <div class="q-subsection-title">Ventas y Antigüedad</div>
+          <div class="q-field">
+            <label>Ventas anuales último ejercicio fiscal</label>
+            <input type="text" name="ventas_anuales" placeholder="$" />
+          </div>
+          <div class="q-field">
+            <label>Antigüedad de la empresa</label>
+            <input type="text" name="antiguedad_empresa" placeholder="años" />
+          </div>
+        </div>
+        <div>
+          <div class="q-subsection-title">Clientes Frecuentes</div>
+          <div class="q-field">
+            <label>¿Cuenta con clientes frecuentes?</label>
+            <div class="q-radio-inline">
+              <label><input type="radio" name="clientes_frecuentes" value="si" /> Sí</label>
+              <label><input type="radio" name="clientes_frecuentes" value="no" /> No</label>
+            </div>
+          </div>
+          <div class="q-field">
+            <label>¿Qué % de ventas son a dichos clientes?</label>
+            <input type="text" name="pct_ventas_clientes" placeholder="%" />
+          </div>
+        </div>
+        <div>
+          <div class="q-subsection-title">Redes Sociales</div>
+          <div class="q-field"><label>Instagram</label><input type="text" name="redes_instagram" /></div>
+          <div class="q-field"><label>Facebook</label><input type="text" name="redes_facebook" /></div>
+          <div class="q-field"><label>LinkedIn</label><input type="text" name="redes_linkedin" /></div>
+          <div class="q-field"><label>Página web</label><input type="text" name="redes_web" /></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── C: VERIFICACIÓN INTERPERSONAL ─────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">C) VERIFICACIÓN INTERPERSONAL</div>
+    <div class="q-section-body">
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>Cómo se percibe al personal</label>
+          <select name="percepcion_personal">
+            <option value="">Selecciona…</option>
+            <option>Conforme</option>
+            <option>Inconforme</option>
+            <option>Sin personal presente</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>Relación entre directivos y empleados</label>
+          <select name="relacion_directivos">
+            <option value="">Selecciona…</option>
+            <option>Buena</option>
+            <option>Regular</option>
+            <option>Mala</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>Condiciones laborales y del inmueble</label>
+          <select name="condiciones_laborales">
+            <option value="">Selecciona…</option>
+            <option>Buenas y seguras</option>
+            <option>Regulares</option>
+            <option>Malas</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>¿Ha tenido huelgas o paros laborales?</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="huelgas" value="si" /> Sí</label>
+            <label><input type="radio" name="huelgas" value="no" /> No</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-subsection-title" style="margin-top:.75rem;">Seguridad en general cuenta con:</div>
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>Cámaras de seguridad</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="camaras_seguridad" value="si" /> Sí</label>
+            <label><input type="radio" name="camaras_seguridad" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Extinguidores</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="extinguidores" value="si" /> Sí</label>
+            <label><input type="radio" name="extinguidores" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Reglas de seguridad</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="reglas_seguridad" value="si" /> Sí</label>
+            <label><input type="radio" name="reglas_seguridad" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Seguro del local/edificio</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="seguro_local" value="si" /> Sí</label>
+            <label><input type="radio" name="seguro_local" value="no" /> No</label>
+          </div>
+        </div>
+      </div>
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>Controles de acceso</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="controles_acceso" value="si" /> Sí</label>
+            <label><input type="radio" name="controles_acceso" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Guardias</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="guardias" value="si" /> Sí</label>
+            <label><input type="radio" name="guardias" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Otros (detalle)</label>
+          <input type="text" name="seguridad_otros" />
+        </div>
+        <div class="q-field">
+          <label>Nombre de aseguradora</label>
+          <input type="text" name="aseguradora" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── D: PRODUCCIÓN Y PROVEEDORES ───────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">D) PRODUCCIÓN Y PROVEEDORES</div>
+    <div class="q-section-body">
+      <div class="q-row q-row-4">
+        <div class="q-field">
+          <label>% actual de capacidad trabajando</label>
+          <input type="text" name="capacidad_pct" placeholder="%" />
+        </div>
+        <div class="q-field">
+          <label>Cuando obtiene los insumos</label>
+          <select name="cuando_insumos">
+            <option value="">Selecciona…</option>
+            <option>Los almaceno</option>
+            <option>Bajo pedido</option>
+            <option>Just in time</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>Condiciones de pago</label>
+          <select name="condiciones_pago">
+            <option value="">Selecciona…</option>
+            <option>Crédito</option>
+            <option>Contado</option>
+            <option>Mixto</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>¿Le han negado crédito?</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="negado_credito" value="si" /> Sí</label>
+            <label><input type="radio" name="negado_credito" value="no" /> No</label>
+          </div>
+        </div>
+      </div>
+      <div class="q-row q-row-3">
+        <div class="q-field">
+          <label>Causas o problemas</label>
+          <input type="text" name="causas_problemas" />
+        </div>
+        <div class="q-field">
+          <label>Cómo obtiene los insumos</label>
+          <select name="como_insumos">
+            <option value="">Selecciona…</option>
+            <option>Varios proveedores</option>
+            <option>Un proveedor</option>
+            <option>Fabricación propia</option>
+            <option>Importación</option>
+          </select>
+        </div>
+        <div class="q-field">
+          <label>Relación con clientes</label>
+          <select name="relacion_clientes">
+            <option value="">Selecciona…</option>
+            <option>Buena</option>
+            <option>Regular</option>
+            <option>Mala</option>
+          </select>
+        </div>
+      </div>
+      <div class="q-row q-row-3">
+        <div class="q-field"><label>Especifique (insumos)</label><input type="text" name="especifique_insumos" /></div>
+        <div class="q-field"><label>Especifique (proveedores)</label><input type="text" name="especifique_proveedores" /></div>
+        <div class="q-field"><label>Especifique (clientes)</label><input type="text" name="especifique_clientes" /></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── E: ACTIVIDAD ───────────────────────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">E) ACTIVIDAD</div>
+    <div class="q-section-body">
+      <div class="q-field q-field-full">
+        <label>Actividad o servicio que se observa en la visita</label>
+        <input type="text" name="actividad_observada" />
+      </div>
+      <div class="q-field q-field-full">
+        <label>Actividad o servicio registrada ante el SAT</label>
+        <input type="text" name="actividad_sat" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── F: FOTOGRAFÍAS ─────────────────────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">F) FOTOGRAFÍAS ANEXAS Y CROQUIS</div>
+    <div class="q-section-body">
+      <div class="q-subsection-title">Fotografías del negocio y de la ubicación del domicilio</div>
+      <div class="photo-slots-grid photo-slots-3">
+        <!-- Slot foto_vialidad -->
+        <div class="photo-slot">
+          <div class="photo-slot-label">Foto principal – Vialidad</div>
+          <select id="slot-select-foto_vialidad" class="photo-slot-select">
+            <option value="">— Sin foto —</option>
+          </select>
+          <div id="slot-preview-foto_vialidad" class="photo-slot-preview">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+        </div>
+        <!-- Slot foto_fachada -->
+        <div class="photo-slot">
+          <div class="photo-slot-label">Foto del ejecutivo en la fachada</div>
+          <select id="slot-select-foto_fachada" class="photo-slot-select">
+            <option value="">— Sin foto —</option>
+          </select>
+          <div id="slot-preview-foto_fachada" class="photo-slot-preview">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+        </div>
+        <!-- Slot foto_interior_ejecutivo -->
+        <div class="photo-slot">
+          <div class="photo-slot-label">Foto del ejecutivo en el interior</div>
+          <select id="slot-select-foto_interior_ejecutivo" class="photo-slot-select">
+            <option value="">— Sin foto —</option>
+          </select>
+          <div id="slot-preview-foto_interior_ejecutivo" class="photo-slot-preview">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-subsection-title" style="margin-top:1.25rem;">Fotografías interior del negocio</div>
+      <div class="photo-slots-grid photo-slots-3">
+        <!-- Slot foto_inventario -->
+        <div class="photo-slot">
+          <div class="photo-slot-label">Inventario</div>
+          <select id="slot-select-foto_inventario" class="photo-slot-select">
+            <option value="">— Sin foto —</option>
+          </select>
+          <div id="slot-preview-foto_inventario" class="photo-slot-preview">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+        </div>
+        <!-- Slot foto_maquinaria -->
+        <div class="photo-slot">
+          <div class="photo-slot-label">Maquinaria y Equipo</div>
+          <select id="slot-select-foto_maquinaria" class="photo-slot-select">
+            <option value="">— Sin foto —</option>
+          </select>
+          <div id="slot-preview-foto_maquinaria" class="photo-slot-preview">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+        </div>
+        <!-- Slot foto_oficinas -->
+        <div class="photo-slot">
+          <div class="photo-slot-label">Oficinas y Atención al Cliente</div>
+          <select id="slot-select-foto_oficinas" class="photo-slot-select">
+            <option value="">— Sin foto —</option>
+          </select>
+          <div id="slot-preview-foto_oficinas" class="photo-slot-preview">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-subsection-title" style="margin-top:1.25rem;">Croquis de ubicación y coordenadas</div>
+      <div id="geo-from-interview" hidden class="geo-notice">
+        📍 Coordenadas capturadas: <strong id="geo-coords"></strong>
+      </div>
+      <div class="q-field q-field-full">
+        <label>URL o coordenada de geolocalización</label>
+        <input type="text" name="url_geolocalizacion" placeholder="lat, lng o URL de mapa" />
+      </div>
+      <div class="q-field q-field-full">
+        <label>Croquis / descripción de ubicación</label>
+        <textarea name="croquis_descripcion" rows="3" placeholder="Describe la ubicación, referencias o pega descripción del mapa…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── G: COMENTARIOS DEL VERIFICADOR ────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">G) COMENTARIOS DEL VERIFICADOR</div>
+    <div class="q-section-body">
+      <div class="q-field q-field-full">
+        <textarea name="comentarios_verificador" rows="5" placeholder="Observaciones generales de la visita…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── H: DIFERENCIAS ENCONTRADAS ───────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">H) DIFERENCIAS ENCONTRADAS</div>
+    <div class="q-section-body">
+      <div class="q-row q-row-3">
+        <div class="q-field">
+          <label>En la dirección del solicitante o del negocio</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="diff_direccion" value="si" /> Sí</label>
+            <label><input type="radio" name="diff_direccion" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>En la producción</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="diff_produccion" value="si" /> Sí</label>
+            <label><input type="radio" name="diff_produccion" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="q-field">
+          <label>Falsedad de información</label>
+          <div class="q-radio-inline">
+            <label><input type="radio" name="diff_falsedad" value="si" /> Sí</label>
+            <label><input type="radio" name="diff_falsedad" value="no" /> No</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-field q-field-full" style="margin-top:1rem;">
+        <label style="font-size:1.05rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">SE RECOMIENDA</label>
+        <textarea name="se_recomienda" rows="3" placeholder="Recomendación del verificador…" style="font-size:.95rem;"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FIRMA ──────────────────────────────────────────────────── -->
+  <div class="q-section">
+    <div class="q-section-header">FIRMA Y DATOS DEL VERIFICADOR</div>
+    <div class="q-section-body">
+      <div class="q-row q-row-2">
+        <div class="q-field q-field-full">
+          <label>Nombre de quien realizó la presente investigación</label>
+          <input type="text" name="investigador_nombre" />
+        </div>
+      </div>
+      <div class="q-row q-row-4" style="margin-top:.5rem;">
+        <div class="q-field">
+          <label>CR</label>
+          <input type="text" name="sucursal_cr" />
+        </div>
+        <div class="q-field">
+          <label>Sucursal</label>
+          <input type="text" name="sucursal_nombre" />
+        </div>
+        <div class="q-field">
+          <label>Región</label>
+          <input type="text" name="sucursal_region" />
+        </div>
+        <div class="q-field">
+          <label>Territorio</label>
+          <input type="text" name="sucursal_territorio" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botones inferiores -->
+  <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.5rem;">
+    <button id="btn-save-bottom"  class="btn btn-ghost">💾 Guardar</button>
+    <button id="btn-pdf-bottom"   class="btn btn-primary">📄 Generar PDF</button>
+  </div>
+
+</div><!-- /q-container -->
+
+<script src="/assets/questionnaire-pyme.js"></script>
+</body>
+</html>

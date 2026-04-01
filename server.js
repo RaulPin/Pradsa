@@ -85,7 +85,8 @@ const htmlPages = {
   '/dashboard': 'dashboard.html',
   '/interview': 'interview.html',
   '/join': 'join.html',
-  '/questionnaire': 'questionnaire.html',
+  '/questionnaire':      'questionnaire.html',
+  '/questionnaire-pyme': 'questionnaire-pyme.html',
 };
 
 Object.entries(htmlPages).forEach(([route, file]) => {

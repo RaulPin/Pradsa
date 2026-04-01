@@ -9,6 +9,7 @@ const WS_RECONNECT_DELAYS = [2000, 4000, 8000, 16000, 30000];
 
 // ─── Estado ───────────────────────────────────────────────────────────────────
 let interviewId;
+let interviewType;
 let ws;
 let pc;
 let localStream;
@@ -60,6 +61,7 @@ const canvas       = document.getElementById('capture-canvas');
   // Cargar datos de la entrevista
   try {
     const data = await fetchJSON(`/api/interviews/${interviewId}`);
+    interviewType = data.type;
     callTitle.textContent = data.title;
     callTypeBadge.textContent = data.type === 'pyme' ? 'Pyme' : 'Fiduciario';
     callTypeBadge.className = `badge badge-${data.type}`;
@@ -274,7 +276,8 @@ function initControls() {
   document.getElementById('btn-capture').addEventListener('click', capturePhoto);
 
   document.getElementById('btn-questionnaire').addEventListener('click', () => {
-    window.open(`/questionnaire?id=${interviewId}`, '_blank');
+    const page = interviewType === 'pyme' ? '/questionnaire-pyme' : '/questionnaire';
+    window.open(`${page}?id=${interviewId}`, '_blank');
   });
 
   // Auto-guardar notas

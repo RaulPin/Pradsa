@@ -404,4 +404,408 @@ function generateFiduciarioReport(req, res) {
   res.send(html);
 }
 
-module.exports = { generateFiduciarioReport };
+// ─── Reporte PYME ─────────────────────────────────────────────────────────────
+function generatePymeReport(req, res) {
+  const { id } = req.params;
+  const { userId, role } = req.user;
+
+  const interview = db.prepare('SELECT * FROM interviews WHERE id=?').get(id);
+  if (!interview) return res.status(404).send('Entrevista no encontrada');
+  if (role !== 'admin' && interview.scheduled_by !== userId) {
+    return res.status(403).send('Acceso denegado');
+  }
+
+  const session   = db.prepare('SELECT * FROM interview_sessions WHERE interview_id=? ORDER BY created_at DESC LIMIT 1').get(id);
+  const qRow      = db.prepare('SELECT * FROM questionnaire_responses WHERE interview_id=?').get(id);
+  const interviewer = db.prepare('SELECT name FROM users WHERE id=?').get(interview.scheduled_by);
+
+  let r = {};
+  if (qRow?.responses) {
+    try { r = JSON.parse(qRow.responses); } catch { r = {}; }
+  }
+
+  const geoCoords = session?.interviewee_location_lat
+    ? `${session.interviewee_location_lat.toFixed(6)}, ${session.interviewee_location_lng.toFixed(6)}`
+    : '';
+  const geoDisplay = val(r, 'url_geolocalizacion', geoCoords || '—');
+
+  const SLOTS = [
+    ['foto_vialidad',           'Foto principal – Vialidad'],
+    ['foto_fachada',            'Foto del ejecutivo en la fachada'],
+    ['foto_interior_ejecutivo', 'Foto del ejecutivo en el interior'],
+    ['foto_inventario',         'Inventario'],
+    ['foto_maquinaria',         'Maquinaria y Equipo'],
+    ['foto_oficinas',           'Oficinas y Atención al Cliente'],
+  ];
+
+  const slotImgs = {};
+  SLOTS.forEach(([key]) => {
+    const filename = val(r, key);
+    slotImgs[key] = filename ? photoB64(id, filename) : null;
+  });
+
+  const yesno = (key) => {
+    const v = val(r, key);
+    if (!v) return '—';
+    return v === 'si' ? 'SÍ' : 'NO';
+  };
+
+  const photoCell = (key, label) => {
+    const img = slotImgs[key];
+    return `
+      <div class="photo-cell">
+        <div class="photo-label">${label}</div>
+        <div class="photo-box">
+          ${img ? `<img src="${img}" alt="${label}" />` : '<div class="photo-empty">Sin fotografía</div>'}
+        </div>
+      </div>`;
+  };
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Reporte de Visita Ocular – Pyme</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #111; background: #fff; }
+  .page { width: 210mm; min-height: 297mm; padding: 12mm 13mm 10mm; margin: 0 auto; }
+  @media print {
+    .no-print { display: none !important; }
+    .page { margin: 0; padding: 10mm 11mm; page-break-after: always; }
+    .page:last-child { page-break-after: avoid; }
+  }
+  .no-print { position: fixed; top: 12px; right: 12px; z-index: 999; display: flex; gap: 8px; }
+  .btn-print { background: #1e3a5f; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-print:hover { background: #2563eb; }
+
+  /* Header */
+  .rh { display: flex; justify-content: space-between; align-items: flex-start; border: 1px solid #333; margin-bottom: 2mm; }
+  .rh-brand { padding: 3mm 5mm; border-right: 1px solid #333; }
+  .rh-brand .brand-sub { font-size: 7.5pt; color: #555; }
+  .rh-title { flex: 1; text-align: center; font-size: 11pt; font-weight: 700; padding: 4mm; align-self: center; }
+  .rh-meta { border-left: 1px solid #333; font-size: 8pt; min-width: 52mm; }
+  .rh-meta-row { display: flex; border-bottom: 1px solid #ddd; }
+  .rh-meta-row:last-child { border-bottom: none; }
+  .rh-meta-row .mkey { background: #f0f0f0; padding: 1.5mm 2mm; font-weight: 700; white-space: nowrap; border-right: 1px solid #ddd; min-width: 28mm; }
+  .rh-meta-row .mval { padding: 1.5mm 2mm; flex: 1; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 2mm; }
+  th, td { border: 1px solid #999; padding: 1.5mm 2mm; vertical-align: top; }
+  th { background: #dce3ed; font-weight: 700; font-size: 8pt; }
+  .section-th { background: #1e3a5f; color: #fff; font-size: 8.5pt; text-align: left; padding: 2mm 3mm; }
+
+  .val { min-height: 5mm; }
+  .yn { text-align: center; }
+  .small { font-size: 7.5pt; color: #555; }
+
+  /* Photos */
+  .photos-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 1px solid #333; border-left: 1px solid #333; }
+  .photos-grid-2 { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #333; border-left: 1px solid #333; }
+  .photo-cell { border-right: 1px solid #333; border-bottom: 1px solid #333; }
+  .photo-label { font-size: 7pt; font-weight: 700; padding: 1.5mm 2mm; border-bottom: 1px solid #ccc; background: #fafafa; }
+  .photo-box { width: 100%; height: 72mm; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f5f5f5; }
+  .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-empty { color: #aaa; font-size: 8pt; }
+
+  .text-box { border: 1px solid #999; min-height: 24mm; padding: 2mm; font-size: 9pt; white-space: pre-wrap; word-break: break-word; }
+  .sign-box { border: 1px solid #999; min-height: 25mm; }
+  .sign-label { font-size: 7.5pt; color: #555; text-align: center; border-top: 1px solid #999; padding: 1.5mm; }
+  .footer-line { display: flex; justify-content: space-between; margin-top: 3mm; font-size: 7.5pt; border-top: 1px solid #ccc; padding-top: 2mm; }
+
+  .recomienda-box { border: 2px solid #333; text-align: center; font-size: 14pt; font-weight: 900; letter-spacing: .1em; padding: 3mm; margin: 2mm 0; }
+  .recomienda-val { border: 1px solid #999; min-height: 12mm; padding: 2mm; font-size: 10pt; }
+</style>
+</head>
+<body>
+<div class="no-print">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button class="btn-print" style="background:#475569;" onclick="window.close()">Cerrar</button>
+</div>
+
+<!-- ══ PÁGINA 1 ══ -->
+<div class="page">
+
+  <!-- Header -->
+  <div class="rh">
+    <div class="rh-brand">
+      <div style="font-size:16pt;font-weight:900;color:#1e3a5f;">EntrevistasPradsa</div>
+      <div class="brand-sub">Informe Confidencial</div>
+    </div>
+    <div class="rh-title">REPORTE DE VISITA OCULAR</div>
+    <div class="rh-meta">
+      <div class="rh-meta-row"><div class="mkey">ID del cliente</div><div class="mval">${val(r,'id_cliente')}</div></div>
+      <div class="rh-meta-row"><div class="mkey">Monto crédito</div><div class="mval">${val(r,'monto_credito')}</div></div>
+      <div class="rh-meta-row"><div class="mkey">Fecha visita</div><div class="mval">${val(r,'fecha_visita')}</div></div>
+      <div class="rh-meta-row"><div class="mkey">Destino crédito</div><div class="mval">${val(r,'destino_credito','Capital de Trabajo')}</div></div>
+    </div>
+  </div>
+
+  <!-- A: Datos del solicitante -->
+  <table>
+    <tr><th colspan="6" class="section-th">A) DATOS DEL SOLICITANTE DEL CRÉDITO</th></tr>
+    <tr><th colspan="6">NOMBRE, RAZÓN SOCIAL O DENOMINACIÓN SOCIAL</th></tr>
+    <tr><td colspan="6" class="val">${val(r,'razon_social')}</td></tr>
+    <tr>
+      <th colspan="2">CALLE Y NÚMERO</th>
+      <th colspan="2">COLONIA</th>
+      <th colspan="2">MUNICIPIO / ESTADO</th>
+    </tr>
+    <tr>
+      <td colspan="2" class="val">${val(r,'calle_numero')}</td>
+      <td colspan="2" class="val">${val(r,'colonia')}</td>
+      <td colspan="2" class="val">${val(r,'municipio_estado')}</td>
+    </tr>
+    <tr>
+      <th rowspan="3" style="width:14mm;vertical-align:middle;">GIRO</th>
+      <td rowspan="3" class="val">${val(r,'giro')}</td>
+      <th>TELÉFONOS</th>
+      <td class="val">${val(r,'telefonos')}</td>
+      <th>RFC</th>
+      <td class="val">${val(r,'rfc')}</td>
+    </tr>
+    <tr>
+      <th>REP. LEGAL</th>
+      <td colspan="3" class="val">${val(r,'rep_legal')}</td>
+    </tr>
+    <tr>
+      <th>INMUEBLE</th>
+      <td class="val">${val(r,'inmueble')}</td>
+      <th>TIPO DE ZONA</th>
+      <td class="val">${val(r,'tipo_zona')}</td>
+    </tr>
+    <tr>
+      <th>TIPO DE INMUEBLE</th>
+      <td class="val">${val(r,'tipo_inmueble')}</td>
+      <th>TIEMPO DE RESIDIR</th>
+      <td class="val">${val(r,'tiempo_residir')}</td>
+      <th>TIPO DE DOMICILIO</th>
+      <td class="val">${val(r,'tipo_domicilio')}</td>
+    </tr>
+  </table>
+
+  <!-- B: Situación de la empresa -->
+  <table>
+    <tr><th colspan="8" class="section-th">B) SITUACIÓN DE LA EMPRESA</th></tr>
+    <tr>
+      <th colspan="2">LOS TRABAJADORES CUENTAN CON</th>
+      <th colspan="2">EMPLEADOS</th>
+      <th colspan="2">SUCURSALES</th>
+      <th colspan="2">ESTADOS/MUNS. CON SUCURSALES</th>
+    </tr>
+    <tr>
+      <td class="small">IMSS</td><td class="yn">${yesno('imss')}</td>
+      <td class="small">Cantidad total</td><td class="val">${val(r,'empleados_total')}</td>
+      <td class="small">¿Tiene sucursales?</td><td class="yn">${yesno('tiene_sucursales')}</td>
+      <td colspan="2" rowspan="3" style="vertical-align:top;" class="val">${val(r,'estados_sucursales')}</td>
+    </tr>
+    <tr>
+      <td class="small">INFONAVIT</td><td class="yn">${yesno('infonavit')}</td>
+      <td class="small">Administrativos</td><td class="val">${val(r,'empleados_admin')}</td>
+      <td class="small">¿Cuántas?</td><td class="val">${val(r,'num_sucursales')}</td>
+    </tr>
+    <tr>
+      <td class="small">SINDICATO</td><td class="yn">${yesno('sindicato')}</td>
+      <td class="small">Operación</td><td class="val">${val(r,'empleados_operacion')}</td>
+      <td class="small">¿Cuántas operando?</td><td class="val">${val(r,'sucursales_operando')}</td>
+    </tr>
+    <tr>
+      <th colspan="2">VENTAS Y ANTIGÜEDAD</th>
+      <th colspan="2">CLIENTES FRECUENTES</th>
+      <th colspan="4">REDES SOCIALES</th>
+    </tr>
+    <tr>
+      <td class="small">Ventas anuales últ. ej. fiscal</td>
+      <td class="val">${val(r,'ventas_anuales')}</td>
+      <td class="small">¿Cuenta con clientes frecuentes?</td>
+      <td class="yn">${yesno('clientes_frecuentes')}</td>
+      <td class="small">Instagram</td><td class="val">${val(r,'redes_instagram')}</td>
+      <td class="small">Facebook</td><td class="val">${val(r,'redes_facebook')}</td>
+    </tr>
+    <tr>
+      <td class="small">Antigüedad de la empresa</td>
+      <td class="val">${val(r,'antiguedad_empresa')}</td>
+      <td class="small">% ventas a dichos clientes</td>
+      <td class="val">${val(r,'pct_ventas_clientes')}</td>
+      <td class="small">LinkedIn</td><td class="val">${val(r,'redes_linkedin')}</td>
+      <td class="small">Página web</td><td class="val">${val(r,'redes_web')}</td>
+    </tr>
+  </table>
+
+  <!-- C: Verificación interpersonal -->
+  <table>
+    <tr><th colspan="4" class="section-th">C) VERIFICACIÓN INTERPERSONAL</th></tr>
+    <tr>
+      <th>CÓMO SE PERCIBE AL PERSONAL</th>
+      <th>RELACIÓN DIRECTIVOS/EMPLEADOS</th>
+      <th>CONDICIONES LABORALES Y DEL INMUEBLE</th>
+      <th>¿HA TENIDO HUELGAS O PAROS?</th>
+    </tr>
+    <tr>
+      <td class="val">${val(r,'percepcion_personal')}</td>
+      <td class="val">${val(r,'relacion_directivos')}</td>
+      <td class="val">${val(r,'condiciones_laborales')}</td>
+      <td class="yn">${yesno('huelgas')}</td>
+    </tr>
+    <tr><th colspan="4" style="font-size:8pt;">SEGURIDAD EN GENERAL CUENTA CON:</th></tr>
+    <tr>
+      <td class="small">Cámaras de seguridad: <strong>${yesno('camaras_seguridad')}</strong></td>
+      <td class="small">Extinguidores: <strong>${yesno('extinguidores')}</strong></td>
+      <td class="small">Reglas de seguridad: <strong>${yesno('reglas_seguridad')}</strong></td>
+      <td class="small">Seguro local/edificio: <strong>${yesno('seguro_local')}</strong></td>
+    </tr>
+    <tr>
+      <td class="small">Controles de acceso: <strong>${yesno('controles_acceso')}</strong></td>
+      <td class="small">Guardias: <strong>${yesno('guardias')}</strong></td>
+      <td class="small">Otros: ${val(r,'seguridad_otros','—')}</td>
+      <td class="small">Aseguradora: ${val(r,'aseguradora','—')}</td>
+    </tr>
+  </table>
+
+  <!-- D: Producción y proveedores -->
+  <table>
+    <tr><th colspan="4" class="section-th">D) PRODUCCIÓN Y PROVEEDORES</th></tr>
+    <tr>
+      <th>% CAPACIDAD TRABAJANDO</th>
+      <th>CUÁNDO OBTIENE LOS INSUMOS</th>
+      <th>CONDICIONES DE PAGO</th>
+      <th>¿LE HAN NEGADO CRÉDITO?</th>
+    </tr>
+    <tr>
+      <td class="val">${val(r,'capacidad_pct')}</td>
+      <td class="val">${val(r,'cuando_insumos')}</td>
+      <td class="val">${val(r,'condiciones_pago')}</td>
+      <td class="yn">${yesno('negado_credito')}</td>
+    </tr>
+    <tr>
+      <th>CAUSAS O PROBLEMAS</th>
+      <th>CÓMO OBTIENE LOS INSUMOS</th>
+      <th>RELACIÓN CON CLIENTES</th>
+      <th>ESPECIFIQUE</th>
+    </tr>
+    <tr>
+      <td class="val">${val(r,'causas_problemas')}</td>
+      <td class="val">${val(r,'como_insumos')}</td>
+      <td class="val">${val(r,'relacion_clientes')}</td>
+      <td class="val">${val(r,'especifique_clientes')}</td>
+    </tr>
+  </table>
+
+  <!-- E: Actividad -->
+  <table>
+    <tr><th colspan="2" class="section-th">E) ACTIVIDAD</th></tr>
+    <tr><th>ACTIVIDAD O SERVICIO QUE SE OBSERVA EN LA VISITA</th><th>ACTIVIDAD O SERVICIO REGISTRADA ANTE EL SAT</th></tr>
+    <tr>
+      <td class="val">${val(r,'actividad_observada')}</td>
+      <td class="val">${val(r,'actividad_sat')}</td>
+    </tr>
+  </table>
+
+  <!-- F: Fotos fachada/vialidad (3 celdas) -->
+  <div style="margin-bottom:1.5mm;font-weight:700;font-size:8pt;background:#dce3ed;border:1px solid #999;padding:1.5mm 3mm;">F) FOTOGRAFÍAS ANEXAS Y CROQUIS – Fotografías del negocio y de la ubicación del domicilio</div>
+  <div class="photos-grid-3">
+    ${photoCell('foto_vialidad',           'Foto principal – Vialidad')}
+    ${photoCell('foto_fachada',            'Foto del ejecutivo en la fachada')}
+    ${photoCell('foto_interior_ejecutivo', 'Foto del ejecutivo en el interior')}
+  </div>
+
+  <div class="footer-line">
+    <span>${val(r,'razon_social')} · Pyme</span>
+    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''} · 1/3</span>
+  </div>
+</div><!-- /page 1 -->
+
+<!-- ══ PÁGINA 2 ══ -->
+<div class="page">
+
+  <!-- F (cont): Croquis + geo -->
+  <div style="margin-bottom:1.5mm;font-weight:700;font-size:8pt;background:#dce3ed;border:1px solid #999;padding:1.5mm 3mm;">F) CROQUIS DE UBICACIÓN Y COORDENADAS</div>
+  <div style="border:1px solid #999;min-height:55mm;margin-bottom:2mm;padding:2mm;font-size:8.5pt;color:#555;">
+    ${val(r,'croquis_descripcion','(Croquis del inmueble / descripción de ubicación)')}
+  </div>
+  <div style="border:1px solid #eee;padding:2mm;font-size:8.5pt;margin-bottom:3mm;">
+    <strong>URL / Coordenadas:</strong> ${geoDisplay}
+  </div>
+
+  <!-- F: Fotos interior (3 celdas) -->
+  <div style="margin-bottom:1.5mm;font-weight:700;font-size:8pt;background:#dce3ed;border:1px solid #999;padding:1.5mm 3mm;">FOTOGRAFÍAS INTERIOR DEL NEGOCIO</div>
+  <div class="photos-grid-3" style="margin-bottom:3mm;">
+    ${photoCell('foto_inventario', 'Inventario')}
+    ${photoCell('foto_maquinaria', 'Maquinaria y Equipo')}
+    ${photoCell('foto_oficinas',   'Oficinas y Atención al Cliente')}
+  </div>
+
+  <div class="footer-line">
+    <span>${val(r,'razon_social')} · Pyme</span>
+    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''} · 2/3</span>
+  </div>
+</div><!-- /page 2 -->
+
+<!-- ══ PÁGINA 3 ══ -->
+<div class="page">
+
+  <!-- G: Comentarios -->
+  <div style="margin-bottom:1.5mm;font-weight:700;font-size:8pt;background:#dce3ed;border:1px solid #999;padding:1.5mm 3mm;">G) COMENTARIOS DEL VERIFICADOR</div>
+  <div class="text-box" style="min-height:40mm;margin-bottom:3mm;">${val(r,'comentarios_verificador')}</div>
+
+  <!-- H: Diferencias -->
+  <table style="margin-bottom:2mm;">
+    <tr><th colspan="2" class="section-th">H) DIFERENCIAS ENCONTRADAS</th></tr>
+    <tr>
+      <td>En la dirección del solicitante o del negocio</td>
+      <td class="yn" style="width:14mm;">${yesno('diff_direccion')}</td>
+    </tr>
+    <tr>
+      <td>En la producción</td>
+      <td class="yn">${yesno('diff_produccion')}</td>
+    </tr>
+    <tr>
+      <td>Falsedad de información</td>
+      <td class="yn">${yesno('diff_falsedad')}</td>
+    </tr>
+  </table>
+
+  <!-- SE RECOMIENDA -->
+  <div class="recomienda-box">SE RECOMIENDA</div>
+  <div class="recomienda-val">${val(r,'se_recomienda')}</div>
+
+  <!-- Firma -->
+  <div style="display:flex;justify-content:center;margin:6mm 0 3mm;">
+    <div style="width:90mm;">
+      <div class="sign-box"></div>
+      <div class="sign-label">Nombre y Firma de quien realizó la presente investigación<br><strong>${val(r,'investigador_nombre')}</strong></div>
+    </div>
+  </div>
+
+  <!-- Tabla sucursal -->
+  <table style="max-width:110mm;margin:0 auto;">
+    <tr><th colspan="4" style="background:#1e3a5f;color:#fff;">NÚMERO Y NOMBRE DE SUCURSAL, TERRITORIO Y REGIÓN</th></tr>
+    <tr>
+      <th style="width:20mm;">CR</th>
+      <th>SUCURSAL</th>
+      <th>REGIÓN</th>
+      <th>TERRITORIO</th>
+    </tr>
+    <tr>
+      <td class="val" style="min-height:7mm;">${val(r,'sucursal_cr')}</td>
+      <td class="val">${val(r,'sucursal_nombre')}</td>
+      <td class="val">${val(r,'sucursal_region')}</td>
+      <td class="val">${val(r,'sucursal_territorio')}</td>
+    </tr>
+  </table>
+
+  <div class="footer-line" style="margin-top:6mm;">
+    <span>${val(r,'razon_social')} · Pyme</span>
+    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''} · 3/3</span>
+  </div>
+</div><!-- /page 3 -->
+
+</body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+}
+
+module.exports = { generateFiduciarioReport, generatePymeReport };
