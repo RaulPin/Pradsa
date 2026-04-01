@@ -15,6 +15,7 @@ require('./src/db/database'); // Inicializa la base de datos y crea admin si no 
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const interviewRoutes = require('./src/routes/interviewRoutes');
+const reportRoutes = require('./src/routes/reportRoutes');
 const { setupSignaling } = require('./src/signaling');
 const { requireAuth } = require('./src/middleware/auth');
 
@@ -76,6 +77,7 @@ app.use('/uploads', requireAuth, express.static(path.join(__dirname, 'uploads'))
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/interviews', interviewRoutes);
+app.use('/report', reportRoutes);
 
 // Páginas HTML
 const htmlPages = {
@@ -83,6 +85,7 @@ const htmlPages = {
   '/dashboard': 'dashboard.html',
   '/interview': 'interview.html',
   '/join': 'join.html',
+  '/questionnaire': 'questionnaire.html',
 };
 
 Object.entries(htmlPages).forEach(([route, file]) => {

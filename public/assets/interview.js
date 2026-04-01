@@ -273,6 +273,10 @@ function initControls() {
 
   document.getElementById('btn-capture').addEventListener('click', capturePhoto);
 
+  document.getElementById('btn-questionnaire').addEventListener('click', () => {
+    window.open(`/questionnaire?id=${interviewId}`, '_blank');
+  });
+
   // Auto-guardar notas
   notesArea.addEventListener('input', debounce(() => {
     fetchJSON(`/api/interviews/${interviewId}`, {

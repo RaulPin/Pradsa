@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EntrevistasPradsa – Cuestionario Fiduciario</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+  <link rel="stylesheet" href="/assets/questionnaire.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-mark sm">EP</span>
+      <span class="nav-title" id="q-interview-title">Cuestionario Fiduciario</span>
+    </div>
+    <div class="nav-user">
+      <span id="q-status-msg" class="muted" style="font-size:.85rem;"></span>
+      <button id="btn-save" class="btn btn-ghost btn-sm">Guardar</button>
+      <button id="btn-pdf" class="btn btn-primary btn-sm">📄 Generar PDF</button>
+      <a href="/dashboard" class="btn btn-ghost btn-sm">← Panel</a>
+    </div>
+  </nav>
+
+  <div class="q-container">
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 1 – ENCABEZADO
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Reporte de Visita Ocular – FIDUCIARIO</h2>
+      <div class="q-grid q-grid-3">
+        <div class="field">
+          <label>Ciudad</label>
+          <input type="text" name="ciudad" placeholder="Nombre de la ciudad" />
+        </div>
+        <div class="field">
+          <label>Día</label>
+          <input type="number" name="fecha_dia" min="1" max="31" placeholder="DD" />
+        </div>
+        <div class="field">
+          <label>Mes</label>
+          <input type="number" name="fecha_mes" min="1" max="12" placeholder="MM" />
+        </div>
+        <div class="field">
+          <label>Año</label>
+          <input type="number" name="fecha_anio" min="2024" max="2099" placeholder="YYYY" />
+        </div>
+        <div class="field">
+          <label>Número de fideicomiso</label>
+          <input type="text" name="numero_fideicomiso" placeholder="Número" />
+        </div>
+      </div>
+
+      <div class="q-row-label">Tipo de visita</div>
+      <div class="q-checks">
+        <label class="q-check"><input type="radio" name="tipo_visita" value="fisica" /> Física</label>
+        <label class="q-check"><input type="radio" name="tipo_visita" value="digital" /> Digital</label>
+      </div>
+
+      <div class="q-row-label" style="margin-top:1rem;">Tipo de persona</div>
+      <div class="q-checks">
+        <label class="q-check"><input type="radio" name="tipo_persona" value="fisica" /> Persona física</label>
+        <label class="q-check"><input type="radio" name="tipo_persona" value="fisica_empresarial" /> Persona física con actividad empresarial</label>
+        <label class="q-check"><input type="radio" name="tipo_persona" value="moral" /> Persona Moral</label>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 2 – IDENTIFICACIÓN
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Identificación</h2>
+      <div class="q-grid q-grid-1">
+        <div class="field">
+          <label>Primer Apellido, Segundo Apellido y Nombre(s)</label>
+          <input type="text" name="apellidos_nombres" placeholder="Apellido Apellido Nombre(s)" />
+        </div>
+        <div class="field">
+          <label>Denominación o razón social (sin abreviaturas)</label>
+          <input type="text" name="denominacion_razon_social" placeholder="Razón social completa" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 3 – PERSONA QUE PROPORCIONA INFORMACIÓN
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Persona que proporciona la información</h2>
+      <div class="q-grid q-grid-2">
+        <div class="field">
+          <label>Nombre completo y sin abreviaturas</label>
+          <input type="text" name="informante_nombre" placeholder="Nombre completo" />
+        </div>
+        <div class="field">
+          <label>Cargo / Puesto / Parentesco</label>
+          <input type="text" name="informante_cargo" placeholder="Cargo o puesto" />
+        </div>
+        <div class="field">
+          <label>Tipo de ID</label>
+          <input type="text" name="informante_id_tipo" placeholder="INE, Pasaporte, etc." />
+        </div>
+        <div class="field">
+          <label>Número de ID</label>
+          <input type="text" name="informante_id_numero" placeholder="Número de identificación" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 4 – DOMICILIO
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Domicilio verificado en la visita</h2>
+
+      <div class="q-checks" style="margin-bottom:1rem;">
+        <label class="q-check"><input type="radio" name="domicilio_tipo" value="fiscal" /> Fiscal</label>
+        <label class="q-check"><input type="radio" name="domicilio_tipo" value="operativo_comercial" /> Operativo / Comercial</label>
+        <label class="q-check"><input type="radio" name="domicilio_tipo" value="ambos" /> Ambos</label>
+        <label class="q-check"><input type="radio" name="domicilio_tipo" value="particular" /> Domicilio Particular</label>
+      </div>
+
+      <div class="q-grid q-grid-2">
+        <div class="field">
+          <label>Calle y Número exterior e interior</label>
+          <input type="text" name="domicilio_calle" placeholder="Calle Núm. Ext. Núm. Int." />
+        </div>
+        <div class="field">
+          <label>Colonia / Urbanización</label>
+          <input type="text" name="domicilio_colonia" placeholder="Colonia" />
+        </div>
+        <div class="field">
+          <label>Delegación / Municipio / Ciudad / Población</label>
+          <input type="text" name="domicilio_municipio" placeholder="Municipio o ciudad" />
+        </div>
+        <div class="field">
+          <label>Entre las calles</label>
+          <input type="text" name="domicilio_entre_calles" placeholder="Calle A y Calle B" />
+        </div>
+        <div class="field">
+          <label>Estado</label>
+          <input type="text" name="domicilio_estado" placeholder="Estado" />
+        </div>
+        <div class="field">
+          <label>Teléfono(s)</label>
+          <input type="text" name="telefono" placeholder="+52 55 0000 0000" />
+        </div>
+        <div class="field q-full">
+          <label>Correo electrónico</label>
+          <input type="email" name="correo" placeholder="correo@ejemplo.com" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 5 – CARACTERÍSTICAS DEL INMUEBLE
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Características del inmueble</h2>
+
+      <div class="q-grid q-grid-2">
+        <div class="field q-full">
+          <label>Actividad económica preponderante (persona física o empresa)</label>
+          <input type="text" name="actividad_economica" placeholder="Describe la actividad económica" />
+        </div>
+        <div class="field">
+          <label>Tiempo de residir en el inmueble (años)</label>
+          <input type="number" name="tiempo_residencia" min="0" placeholder="0" />
+        </div>
+      </div>
+
+      <div class="q-row-inline">
+        <span>¿Se pudo ingresar al inmueble?</span>
+        <label class="q-check"><input type="radio" name="ingreso_inmueble" value="si" /> Sí</label>
+        <label class="q-check"><input type="radio" name="ingreso_inmueble" value="no" /> No</label>
+        <div class="field" style="flex:1;">
+          <input type="text" name="ingreso_inmueble_causa" placeholder="Causa (si aplica)" />
+        </div>
+      </div>
+
+      <div class="q-row-label" style="margin-top:1rem;">El inmueble que ocupa es:</div>
+      <div class="q-checks">
+        <label class="q-check"><input type="radio" name="tenencia_inmueble" value="propio" /> Propio</label>
+        <label class="q-check"><input type="radio" name="tenencia_inmueble" value="rentado" /> Rentado</label>
+        <label class="q-check"><input type="radio" name="tenencia_inmueble" value="otros" /> Otros</label>
+        <div class="field" style="flex:1;">
+          <input type="text" name="tenencia_especifique" placeholder="Especifique" />
+        </div>
+      </div>
+
+      <div class="q-row-label" style="margin-top:1rem;">Tipo de inmueble:</div>
+      <div class="q-checks q-checks-wrap">
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="oficina" /> Oficina</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="local_comercial" /> Local Comercial</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="fabrica" /> Fábrica</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="bodega" /> Bodega</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="oficina_virtual" /> Oficina virtual</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="casa_adaptada" /> Casa Adaptada</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="casa_hab" /> Casa/Hab</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="departamento" /> Departamento</label>
+        <label class="q-check"><input type="radio" name="tipo_inmueble" value="otro" /> Otro</label>
+        <div class="field" style="flex:1;">
+          <input type="text" name="tipo_inmueble_especifique" placeholder="Especifique" />
+        </div>
+      </div>
+
+      <div class="q-row-label" style="margin-top:1rem;">La condición del inmueble es:</div>
+      <div class="q-checks">
+        <label class="q-check"><input type="radio" name="condicion_inmueble" value="buen_estado" /> En buen estado</label>
+        <label class="q-check"><input type="radio" name="condicion_inmueble" value="descuidado" /> Descuidado</label>
+        <label class="q-check"><input type="radio" name="condicion_inmueble" value="abandonado" /> Abandonado</label>
+      </div>
+
+      <div class="q-row-label" style="margin-top:1rem;">La zona socioeconómica donde se ubica el inmueble es de nivel:</div>
+      <div class="q-checks">
+        <label class="q-check"><input type="radio" name="zona_socioeconomica" value="bajo" /> Bajo</label>
+        <label class="q-check"><input type="radio" name="zona_socioeconomica" value="medio" /> Medio</label>
+        <label class="q-check"><input type="radio" name="zona_socioeconomica" value="alto" /> Alto</label>
+      </div>
+
+      <div class="q-row-inline" style="margin-top:1rem;">
+        <span style="flex:2;">¿En el exterior del inmueble se pudo observar algún logotipo/anuncio/número exterior que identifique el negocio?</span>
+        <label class="q-check"><input type="radio" name="logotipo_exterior" value="si" /> Sí</label>
+        <label class="q-check"><input type="radio" name="logotipo_exterior" value="no" /> No</label>
+        <div class="field" style="flex:2;">
+          <input type="text" name="logotipo_exterior_porque" placeholder="¿Por qué?" />
+        </div>
+      </div>
+
+      <div class="q-row-inline" style="margin-top:.75rem;">
+        <span style="flex:2;">¿El cliente autorizó la toma de fotografías dentro del inmueble?</span>
+        <label class="q-check"><input type="radio" name="autorizo_fotografias" value="si" /> Sí</label>
+        <label class="q-check"><input type="radio" name="autorizo_fotografias" value="no" /> No</label>
+        <div class="field" style="flex:2;">
+          <input type="text" name="autorizo_fotografias_porque" placeholder="¿Por qué?" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 6 – OBSERVACIONES
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Observaciones</h2>
+
+      <div class="q-row-inline">
+        <span>¿Se observan empleados?</span>
+        <label class="q-check"><input type="radio" name="empleados" value="si" /> Sí</label>
+        <label class="q-check"><input type="radio" name="empleados" value="no" /> No</label>
+        <div class="field" style="flex:1;">
+          <input type="text" name="empleados_porque" placeholder="¿Por qué?" />
+        </div>
+      </div>
+
+      <div class="q-row-inline" style="margin-top:.75rem;">
+        <span style="flex:2;">Las características e instalaciones del inmueble están acorde a la actividad declarada:</span>
+        <label class="q-check"><input type="radio" name="instalaciones_acorde" value="si" /> Sí</label>
+        <label class="q-check"><input type="radio" name="instalaciones_acorde" value="no" /> No</label>
+      </div>
+
+      <div class="field" style="margin-top:.75rem;">
+        <label>Describir el por qué</label>
+        <input type="text" name="instalaciones_porque" placeholder="Descripción" />
+      </div>
+
+      <div class="field" style="margin-top:.75rem;">
+        <label>Describa brevemente la operación</label>
+        <textarea name="descripcion_operacion" rows="3" placeholder="Descripción de la operación"></textarea>
+      </div>
+
+      <div class="field" style="margin-top:.75rem;">
+        <label>Comentarios del verificador</label>
+        <textarea name="comentarios_verificador" rows="6" placeholder="Comentarios adicionales del verificador"></textarea>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 7 – GEOLOCALIZACIÓN
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Geolocalización</h2>
+      <div class="field">
+        <label>URL o Coordenada de Geolocalización</label>
+        <input type="text" name="url_geolocalizacion" id="url_geolocalizacion" placeholder="https://maps.google.com/... o Lat, Lng" />
+      </div>
+      <div id="geo-from-interview" class="q-geo-box" hidden>
+        <p class="muted" style="font-size:.82rem;">📍 Coordenadas capturadas durante la entrevista:</p>
+        <p id="geo-coords" style="font-size:.88rem;"></p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 8 – FOTOGRAFÍAS
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Fotografías de Visita Ocular</h2>
+      <p class="muted" style="font-size:.85rem;margin-bottom:1rem;">Asigna cada fotografía capturada durante la entrevista a su slot correspondiente.</p>
+
+      <div class="photo-slots-grid">
+
+        <div class="photo-slot" data-slot="foto1">
+          <div class="slot-label">Fotografía 1<br><small>Vialidad principal y propiedad colindantes</small></div>
+          <div class="slot-preview" id="slot-preview-foto1">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+          <select class="slot-select" data-slot="foto1" id="slot-select-foto1">
+            <option value="">— Seleccionar foto —</option>
+          </select>
+        </div>
+
+        <div class="photo-slot" data-slot="foto2">
+          <div class="slot-label">Fotografía 2<br><small>Verificador en fachada (selfie)</small></div>
+          <div class="slot-preview" id="slot-preview-foto2">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+          <select class="slot-select" data-slot="foto2" id="slot-select-foto2">
+            <option value="">— Seleccionar foto —</option>
+          </select>
+        </div>
+
+        <div class="photo-slot" data-slot="foto3">
+          <div class="slot-label">Fotografía 3<br><small>Verificador en interior de la empresa</small></div>
+          <div class="slot-preview" id="slot-preview-foto3">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+          <select class="slot-select" data-slot="foto3" id="slot-select-foto3">
+            <option value="">— Seleccionar foto —</option>
+          </select>
+        </div>
+
+        <div class="photo-slot" data-slot="foto4">
+          <div class="slot-label">Fotografía 4<br><small>Interior del negocio (inventario, maquinaria, etc.)</small></div>
+          <div class="slot-preview" id="slot-preview-foto4">
+            <div class="slot-empty">Sin foto asignada</div>
+          </div>
+          <select class="slot-select" data-slot="foto4" id="slot-select-foto4">
+            <option value="">— Seleccionar foto —</option>
+          </select>
+        </div>
+
+      </div>
+
+      <p class="muted" style="font-size:.78rem;margin-top:.75rem;">* Fotografías internas NO aplica para Persona Física</p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         SECCIÓN 9 – FIRMAS
+    ══════════════════════════════════════════════ -->
+    <div class="q-section">
+      <h2 class="q-section-title">Responsabilidad y firmas</h2>
+      <div class="q-grid q-grid-2">
+        <div class="field">
+          <label>Elaboró – Nombre del Funcionario Fiduciario/Verificador que realiza la visita</label>
+          <input type="text" name="elaboro_nombre" placeholder="Nombre completo" />
+        </div>
+        <div class="field">
+          <label>Autorizó – Nombre del Funcionario Fiduciario/Verificador Proveedor</label>
+          <input type="text" name="autorizo_nombre" placeholder="Nombre completo" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones finales -->
+    <div class="q-actions">
+      <button id="btn-save-bottom" class="btn btn-ghost">Guardar borrador</button>
+      <button id="btn-pdf-bottom" class="btn btn-primary">📄 Generar Reporte PDF</button>
+    </div>
+
+  </div>
+
+  <script src="/assets/questionnaire.js" type="module"></script>
+</body>
+</html>
