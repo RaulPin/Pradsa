@@ -12,11 +12,26 @@ const VALID_STATUSES   = new Set(['pending', 'in_progress', 'completed', 'cancel
 
 const SELECT_TASK = `
   SELECT t.*,
-         u1.name AS assigned_to_name,
-         u2.name AS assigned_by_name
+         u1.name  AS assigned_to_name,
+         u2.name  AS assigned_by_name,
+         c.razon_social   AS client_name,
+         c.nombre_comercial AS client_trade_name,
+         c.contacto_telefono AS client_phone,
+         ca.alias AS client_address_alias,
+         ca.calle AS client_address_calle,
+         ca.num_ext AS client_address_num_ext,
+         ca.colonia AS client_address_colonia,
+         ca.ciudad  AS client_address_ciudad,
+         ca.estado  AS client_address_estado,
+         ca.cp      AS client_address_cp,
+         ca.referencias AS client_address_referencias,
+         ca.lat     AS client_address_lat,
+         ca.lng     AS client_address_lng
   FROM tasks t
-  LEFT JOIN users u1 ON u1.id = t.assigned_to
-  LEFT JOIN users u2 ON u2.id = t.assigned_by
+  LEFT JOIN users u1          ON u1.id  = t.assigned_to
+  LEFT JOIN users u2          ON u2.id  = t.assigned_by
+  LEFT JOIN clients c         ON c.id   = t.client_id
+  LEFT JOIN client_addresses ca ON ca.id = t.client_address_id
 `;
 
 // GET /api/tasks
@@ -49,7 +64,9 @@ router.get('/:id', (req, res) => {
 
 // POST /api/tasks  (admin only)
 router.post('/', requireRole('admin'), (req, res) => {
-  const { title, description, assigned_to, priority, due_date, location_name, location_lat, location_lng } = req.body || {};
+  const { title, description, assigned_to, priority, due_date,
+          location_name, location_lat, location_lng,
+          client_id, client_address_id } = req.body || {};
 
   if (!title) return res.status(400).json({ error: 'El título es requerido' });
   if (priority && !VALID_PRIORITIES.has(priority)) {
@@ -59,14 +76,26 @@ router.post('/', requireRole('admin'), (req, res) => {
     const emp = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'employee' AND active = 1").get(assigned_to);
     if (!emp) return res.status(400).json({ error: 'Empleado asignado no válido' });
   }
+  if (client_id) {
+    if (!db.prepare('SELECT id FROM clients WHERE id = ? AND active = 1').get(client_id)) {
+      return res.status(400).json({ error: 'Cliente no válido' });
+    }
+  }
+  if (client_address_id && client_id) {
+    if (!db.prepare('SELECT id FROM client_addresses WHERE id = ? AND client_id = ?').get(client_address_id, client_id)) {
+      return res.status(400).json({ error: 'Dirección no pertenece al cliente seleccionado' });
+    }
+  }
 
   const { lastInsertRowid } = db.prepare(`
-    INSERT INTO tasks (title, description, assigned_to, assigned_by, priority, due_date, location_name, location_lat, location_lng)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (title, description, assigned_to, assigned_by, priority, due_date,
+                       location_name, location_lat, location_lng, client_id, client_address_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(), description || null, assigned_to || null, req.user.id,
     priority || 'medium', due_date || null,
-    location_name || null, location_lat ?? null, location_lng ?? null
+    location_name || null, location_lat ?? null, location_lng ?? null,
+    client_id || null, client_address_id || null
   );
 
   const task = db.prepare(`${SELECT_TASK} WHERE t.id = ?`).get(lastInsertRowid);
@@ -99,7 +128,8 @@ router.put('/:id', (req, res) => {
       //   - fields explicitly sent (including null) are written as-is
       const body = req.body || {};
       const FIELDS = ['title', 'description', 'assigned_to', 'priority',
-                      'status', 'due_date', 'location_name', 'location_lat', 'location_lng'];
+                      'status', 'due_date', 'location_name', 'location_lat', 'location_lng',
+                      'client_id', 'client_address_id'];
       const sets = [];
       const vals = [];
       for (const field of FIELDS) {

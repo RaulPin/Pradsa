@@ -87,8 +87,8 @@ const STATUS_LABEL   = { pending:'Pendiente', in_progress:'En progreso', complet
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-const PAGES = { dashboard: pageDashboard, employees: pageEmployees, tasks: pageTasks, map: pageMap, attendance: pageAttendance, photos: pagePhotos };
-const PAGE_TITLES = { dashboard:'Dashboard', employees:'Empleados', tasks:'Tareas', map:'Mapa de empleados', attendance:'Asistencia', photos:'Fotos' };
+const PAGES = { dashboard: pageDashboard, employees: pageEmployees, tasks: pageTasks, map: pageMap, attendance: pageAttendance, photos: pagePhotos, clients: pageClients };
+const PAGE_TITLES = { dashboard:'Dashboard', employees:'Empleados', tasks:'Tareas', map:'Mapa de empleados', attendance:'Asistencia', photos:'Fotos', clients:'Clientes' };
 
 function navigate(page) {
   if (!S.token) { renderLogin(); return; }
@@ -131,6 +131,7 @@ function renderShell() {
           <li><a href="#" data-page="map"><span class="nav-icon">📍</span>Mapa</a></li>
           <li><a href="#" data-page="attendance"><span class="nav-icon">📅</span>Asistencia</a></li>
           <li><a href="#" data-page="photos"><span class="nav-icon">📷</span>Fotos</a></li>
+          <li><a href="#" data-page="clients"><span class="nav-icon">🏢</span>Clientes</a></li>
         </ul>
         <div class="sidebar__footer">
           <div class="sidebar__user">
@@ -446,6 +447,9 @@ async function toggleEmployee(emp, onDone) {
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 async function pageTasks(container) {
+  // pre-load clients for modal
+  let allClients = [];
+  try { allClients = await api('GET', '/clients'); } catch (_) {}
   container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
   let tasks = [], employees = [], fStatus = 'all', fPriority = 'all';
 
@@ -514,11 +518,11 @@ async function pageTasks(container) {
 
     document.getElementById('tf-status').addEventListener('change', e => { fStatus = e.target.value; render(); });
     document.getElementById('tf-priority').addEventListener('change', e => { fPriority = e.target.value; render(); });
-    document.getElementById('task-new').addEventListener('click', () => modalTask(null, employees, load));
+    document.getElementById('task-new').addEventListener('click', () => modalTask(null, employees, allClients, load));
 
     container.querySelectorAll('[data-action]').forEach(btn => {
       const task = tasks.find(t => t.id === +btn.dataset.id);
-      if (btn.dataset.action === 'edit') btn.addEventListener('click', () => modalTask(task, employees, load));
+      if (btn.dataset.action === 'edit') btn.addEventListener('click', () => modalTask(task, employees, allClients, load));
       if (btn.dataset.action === 'del')  btn.addEventListener('click', () => deleteTask(task, load));
     });
   }
@@ -526,7 +530,7 @@ async function pageTasks(container) {
   await load();
 }
 
-function modalTask(task, employees, onSave) {
+function modalTask(task, employees, clients, onSave) {
   const isNew = !task;
   const o = document.createElement('div');
   o.className = 'modal-overlay';
@@ -579,6 +583,22 @@ function modalTask(task, employees, onSave) {
             <div class="form-group"><label>Latitud</label><input name="location_lat" type="number" step="any" value="${task?.location_lat??''}"/></div>
             <div class="form-group"><label>Longitud</label><input name="location_lng" type="number" step="any" value="${task?.location_lng??''}"/></div>
           </div>
+          <hr style="margin:.75rem 0;border:none;border-top:1px solid #e5e7eb"/>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cliente</label>
+              <select name="client_id" id="task-client-sel">
+                <option value="">Sin cliente</option>
+                ${clients.map(c=>`<option value="${c.id}"${task?.client_id===c.id?' selected':''}>${esc(c.nombre_comercial||c.razon_social)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Dirección de visita</label>
+              <select name="client_address_id" id="task-addr-sel">
+                <option value="">— selecciona cliente primero —</option>
+              </select>
+            </div>
+          </div>
         </form>
       </div>
       <div class="modal__footer">
@@ -593,6 +613,28 @@ function modalTask(task, employees, onSave) {
   o.querySelector('#mcancel').addEventListener('click', close);
   o.addEventListener('click', e => { if (e.target === o) close(); });
 
+  // Populate addresses when client changes
+  async function loadAddresses(clientId, selectedAddrId) {
+    const sel = o.querySelector('#task-addr-sel');
+    sel.innerHTML = '<option value="">Sin dirección específica</option>';
+    if (!clientId) return;
+    try {
+      const addrs = await api('GET', `/clients/${clientId}/addresses`);
+      addrs.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = `${esc(a.alias)} — ${[a.calle, a.num_ext, a.colonia, a.ciudad].filter(Boolean).join(', ')}`;
+        if (a.id === selectedAddrId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+
+  const clientSel = o.querySelector('#task-client-sel');
+  clientSel.addEventListener('change', () => loadAddresses(clientSel.value, null));
+  // Pre-populate if editing
+  if (task?.client_id) loadAddresses(task.client_id, task.client_address_id);
+
   o.querySelector('#msave').addEventListener('click', async () => {
     const form = o.querySelector('#task-form');
     const errEl = o.querySelector('#merr');
@@ -601,6 +643,8 @@ function modalTask(task, employees, onSave) {
 
     const data = Object.fromEntries(new FormData(form));
     if (data.assigned_to) data.assigned_to = parseInt(data.assigned_to, 10);
+    if (data.client_id) data.client_id = parseInt(data.client_id, 10);
+    if (data.client_address_id) data.client_address_id = parseInt(data.client_address_id, 10);
     if (data.location_lat !== '') data.location_lat = parseFloat(data.location_lat);
     if (data.location_lng !== '') data.location_lng = parseFloat(data.location_lng);
     // Strip empty strings
@@ -1041,6 +1085,267 @@ async function pagePhotos(container) {
   } catch (err) {
     container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
   }
+}
+
+// ─── Clients ──────────────────────────────────────────────────────────────────
+
+async function pageClients(container) {
+  container.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
+  let clients = [];
+
+  async function load() {
+    clients = await api('GET', '/clients');
+    render();
+  }
+
+  function render() {
+    container.innerHTML = `
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Clientes</h2>
+          <button class="btn btn--primary" id="client-new">+ Nuevo cliente</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Razón social / Comercial</th>
+              <th>RFC</th>
+              <th>Contacto</th>
+              <th>Teléfono</th>
+              <th>Direcciones</th>
+              <th>Acciones</th>
+            </tr></thead>
+            <tbody>
+              ${clients.length ? clients.map(c => `
+                <tr>
+                  <td>
+                    <strong>${esc(c.razon_social)}</strong>
+                    ${c.nombre_comercial ? `<div class="muted" style="font-size:.8rem">${esc(c.nombre_comercial)}</div>` : ''}
+                  </td>
+                  <td class="muted">${esc(c.rfc||'—')}</td>
+                  <td>${esc(c.contacto_nombre||'—')}</td>
+                  <td class="muted">${esc(c.contacto_telefono||'—')}</td>
+                  <td><span class="badge badge--pending">${c.address_count} dir.</span></td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button class="btn btn--ghost btn--sm" data-action="view" data-id="${c.id}">Ver / Editar</button>
+                      <button class="btn btn--danger btn--sm" data-action="del" data-id="${c.id}">Desactivar</button>
+                    </div>
+                  </td>
+                </tr>`).join('') : `<tr><td colspan="6" class="table-empty">No hay clientes registrados</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    document.getElementById('client-new').addEventListener('click', () => modalClient(null, load));
+    container.querySelectorAll('[data-action]').forEach(btn => {
+      const client = clients.find(c => c.id === +btn.dataset.id);
+      if (btn.dataset.action === 'view') btn.addEventListener('click', () => modalClient(client, load));
+      if (btn.dataset.action === 'del')  btn.addEventListener('click', async () => {
+        if (!confirm(`¿Desactivar el cliente "${client.razon_social}"?`)) return;
+        try { await api('DELETE', `/clients/${client.id}`); toast('Cliente desactivado'); load(); }
+        catch (err) { toast(err.message, 'error'); }
+      });
+    });
+  }
+
+  try { await load(); } catch (err) {
+    container.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+  }
+}
+
+function modalClient(client, onSave) {
+  const isNew = !client;
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  o.innerHTML = `
+    <div class="modal" style="max-width:700px;width:95vw">
+      <div class="modal__header">
+        <h3>${isNew ? 'Nuevo cliente' : 'Editar cliente'}</h3>
+        <button class="modal__close">✕</button>
+      </div>
+      <div class="modal__body" style="max-height:75vh;overflow-y:auto">
+        <div id="cerr"></div>
+        <form id="client-form">
+          <p style="font-weight:700;color:#374151;margin-bottom:.5rem;font-size:.875rem">DATOS FISCALES</p>
+          <div class="form-row">
+            <div class="form-group" style="flex:2"><label>Razón social *</label><input name="razon_social" required value="${esc(client?.razon_social||'')}"/></div>
+            <div class="form-group"><label>RFC</label><input name="rfc" style="text-transform:uppercase" maxlength="13" value="${esc(client?.rfc||'')}"/></div>
+          </div>
+          <div class="form-group"><label>Régimen fiscal</label><input name="regimen_fiscal" value="${esc(client?.regimen_fiscal||'')}"/></div>
+          <div class="form-row">
+            <div class="form-group" style="flex:2"><label>Calle</label><input name="fiscal_calle" value="${esc(client?.fiscal_calle||'')}"/></div>
+            <div class="form-group"><label>Núm. ext</label><input name="fiscal_num_ext" value="${esc(client?.fiscal_num_ext||'')}"/></div>
+            <div class="form-group"><label>Núm. int</label><input name="fiscal_num_int" value="${esc(client?.fiscal_num_int||'')}"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Colonia</label><input name="fiscal_colonia" value="${esc(client?.fiscal_colonia||'')}"/></div>
+            <div class="form-group"><label>Ciudad / Municipio</label><input name="fiscal_ciudad" value="${esc(client?.fiscal_ciudad||'')}"/></div>
+            <div class="form-group"><label>Estado</label><input name="fiscal_estado" value="${esc(client?.fiscal_estado||'')}"/></div>
+            <div class="form-group" style="max-width:100px"><label>CP</label><input name="fiscal_cp" value="${esc(client?.fiscal_cp||'')}"/></div>
+          </div>
+
+          <hr style="margin:.75rem 0;border:none;border-top:1px solid #e5e7eb"/>
+          <p style="font-weight:700;color:#374151;margin-bottom:.5rem;font-size:.875rem">DATOS DEL NEGOCIO</p>
+          <div class="form-row">
+            <div class="form-group"><label>Nombre comercial</label><input name="nombre_comercial" value="${esc(client?.nombre_comercial||'')}"/></div>
+            <div class="form-group"><label>Contacto</label><input name="contacto_nombre" value="${esc(client?.contacto_nombre||'')}"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Teléfono</label><input name="contacto_telefono" type="tel" value="${esc(client?.contacto_telefono||'')}"/></div>
+            <div class="form-group"><label>Email</label><input name="contacto_email" type="email" value="${esc(client?.contacto_email||'')}"/></div>
+          </div>
+          <div class="form-group"><label>Notas</label><textarea name="notas">${esc(client?.notas||'')}</textarea></div>
+        </form>
+
+        ${!isNew ? `
+        <hr style="margin:.75rem 0;border:none;border-top:1px solid #e5e7eb"/>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <p style="font-weight:700;color:#374151;font-size:.875rem;margin:0">DIRECCIONES DE VISITA</p>
+          <button class="btn btn--sm btn--primary" id="addr-new">+ Agregar dirección</button>
+        </div>
+        <div id="addr-list"></div>` : ''}
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="ccancel">Cancelar</button>
+        <button class="btn btn--primary" id="csave">${isNew?'Crear cliente':'Guardar cambios'}</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(o);
+  const close = () => { o.remove(); onSave(); };
+  const closeOnly = () => o.remove();
+  o.querySelector('.modal__close').addEventListener('click', closeOnly);
+  o.querySelector('#ccancel').addEventListener('click', closeOnly);
+  o.addEventListener('click', e => { if (e.target === o) closeOnly(); });
+
+  // Load addresses for existing client
+  if (!isNew) {
+    loadAddrList(client.id, o);
+    o.querySelector('#addr-new').addEventListener('click', () => modalAddress(null, client.id, () => loadAddrList(client.id, o)));
+  }
+
+  o.querySelector('#csave').addEventListener('click', async () => {
+    const form = o.querySelector('#client-form');
+    const errEl = o.querySelector('#cerr');
+    const btn = o.querySelector('#csave');
+    if (!form.reportValidity()) return;
+
+    const data = Object.fromEntries(new FormData(form));
+    Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
+    if (data.rfc) data.rfc = data.rfc.toUpperCase();
+
+    btn.disabled = true; btn.textContent = 'Guardando…'; errEl.innerHTML = '';
+    try {
+      if (isNew) {
+        await api('POST', '/clients', data);
+        toast('Cliente creado');
+      } else {
+        await api('PUT', `/clients/${client.id}`, data);
+        toast('Cliente actualizado');
+      }
+      close();
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+      btn.disabled = false; btn.textContent = isNew ? 'Crear cliente' : 'Guardar cambios';
+    }
+  });
+}
+
+async function loadAddrList(clientId, o) {
+  const list = o.querySelector('#addr-list');
+  if (!list) return;
+  try {
+    const addrs = await api('GET', `/clients/${clientId}/addresses`);
+    list.innerHTML = addrs.length ? addrs.map(a => `
+      <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:.75rem;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">
+        <div>
+          <strong style="font-size:.875rem">${esc(a.alias)}</strong>
+          <div class="muted" style="font-size:.8rem">${[a.calle, a.num_ext, a.colonia, a.ciudad, a.estado, a.cp].filter(Boolean).join(', ')||'—'}</div>
+          ${a.referencias ? `<div class="muted" style="font-size:.75rem">Ref: ${esc(a.referencias)}</div>` : ''}
+        </div>
+        <div class="flex gap-2" style="flex-shrink:0">
+          <button class="btn btn--ghost btn--sm" data-edit-addr="${a.id}">Editar</button>
+          <button class="btn btn--danger btn--sm" data-del-addr="${a.id}">✕</button>
+        </div>
+      </div>`).join('') : '<p class="muted" style="font-size:.875rem">Sin direcciones. Agrega la primera.</p>';
+
+    list.querySelectorAll('[data-edit-addr]').forEach(btn => {
+      const addr = addrs.find(a => a.id === +btn.dataset.editAddr);
+      btn.addEventListener('click', () => modalAddress(addr, clientId, () => loadAddrList(clientId, o)));
+    });
+    list.querySelectorAll('[data-del-addr]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar esta dirección?')) return;
+        try { await api('DELETE', `/clients/${clientId}/addresses/${btn.dataset.delAddr}`); loadAddrList(clientId, o); toast('Dirección eliminada'); }
+        catch (err) { toast(err.message, 'error'); }
+      });
+    });
+  } catch (_) { list.innerHTML = '<p class="muted">Error cargando direcciones</p>'; }
+}
+
+function modalAddress(addr, clientId, onSave) {
+  const isNew = !addr;
+  const o2 = document.createElement('div');
+  o2.className = 'modal-overlay';
+  o2.style.zIndex = '1001';
+  o2.innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <div class="modal__header">
+        <h3>${isNew ? 'Nueva dirección' : 'Editar dirección'}</h3>
+        <button class="modal__close">✕</button>
+      </div>
+      <div class="modal__body">
+        <div id="aerr"></div>
+        <form id="addr-form">
+          <div class="form-group"><label>Alias *</label><input name="alias" required placeholder="ej. Matriz, Sucursal Norte, Bodega" value="${esc(addr?.alias||'')}"/></div>
+          <div class="form-row">
+            <div class="form-group" style="flex:2"><label>Calle</label><input name="calle" value="${esc(addr?.calle||'')}"/></div>
+            <div class="form-group"><label>Núm. ext</label><input name="num_ext" value="${esc(addr?.num_ext||'')}"/></div>
+            <div class="form-group"><label>Núm. int</label><input name="num_int" value="${esc(addr?.num_int||'')}"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Colonia</label><input name="colonia" value="${esc(addr?.colonia||'')}"/></div>
+            <div class="form-group"><label>Ciudad</label><input name="ciudad" value="${esc(addr?.ciudad||'')}"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Estado</label><input name="estado" value="${esc(addr?.estado||'')}"/></div>
+            <div class="form-group" style="max-width:120px"><label>CP</label><input name="cp" value="${esc(addr?.cp||'')}"/></div>
+          </div>
+          <div class="form-group"><label>Referencias</label><input name="referencias" placeholder="ej. Junto al banco, portón azul" value="${esc(addr?.referencias||'')}"/></div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="acancel">Cancelar</button>
+        <button class="btn btn--primary" id="asave">${isNew?'Agregar':'Guardar'}</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(o2);
+  const close2 = () => o2.remove();
+  o2.querySelector('.modal__close').addEventListener('click', close2);
+  o2.querySelector('#acancel').addEventListener('click', close2);
+  o2.addEventListener('click', e => { if (e.target === o2) close2(); });
+
+  o2.querySelector('#asave').addEventListener('click', async () => {
+    const form = o2.querySelector('#addr-form');
+    const errEl = o2.querySelector('#aerr');
+    const btn = o2.querySelector('#asave');
+    if (!form.reportValidity()) return;
+    const data = Object.fromEntries(new FormData(form));
+    Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
+    btn.disabled = true; btn.textContent = 'Guardando…'; errEl.innerHTML = '';
+    try {
+      if (isNew) await api('POST', `/clients/${clientId}/addresses`, data);
+      else await api('PUT', `/clients/${clientId}/addresses/${addr.id}`, data);
+      toast(isNew ? 'Dirección agregada' : 'Dirección actualizada');
+      close2(); onSave();
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert--error">${esc(err.message)}</div>`;
+      btn.disabled = false; btn.textContent = isNew ? 'Agregar' : 'Guardar';
+    }
+  });
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

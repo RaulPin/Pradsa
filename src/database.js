@@ -101,10 +101,61 @@ db.exec(`
 `);
 
 // ── Migrations ────────────────────────────────────────────────────────────────
-// Add must_change_password flag (ISO 27001:2022 — forced change on first login)
-try {
-  db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
-} catch (_) { /* column already exists — safe to ignore */ }
+try { db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
+
+// Clients + addresses
+db.exec(`
+  CREATE TABLE IF NOT EXISTS clients (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Datos fiscales
+    razon_social        TEXT    NOT NULL,
+    rfc                 TEXT,
+    regimen_fiscal      TEXT,
+    -- Domicilio fiscal
+    fiscal_calle        TEXT,
+    fiscal_num_ext      TEXT,
+    fiscal_num_int      TEXT,
+    fiscal_colonia      TEXT,
+    fiscal_ciudad       TEXT,
+    fiscal_estado       TEXT,
+    fiscal_cp           TEXT,
+    fiscal_pais         TEXT    DEFAULT 'México',
+    -- Datos de contacto del negocio
+    nombre_comercial    TEXT,
+    contacto_nombre     TEXT,
+    contacto_telefono   TEXT,
+    contacto_email      TEXT,
+    notas               TEXT,
+    active              INTEGER NOT NULL DEFAULT 1,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS client_addresses (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    alias       TEXT    NOT NULL,           -- ej. "Matriz", "Sucursal Norte"
+    calle       TEXT,
+    num_ext     TEXT,
+    num_int     TEXT,
+    colonia     TEXT,
+    ciudad      TEXT,
+    estado      TEXT,
+    cp          TEXT,
+    pais        TEXT    DEFAULT 'México',
+    referencias TEXT,
+    lat         REAL,
+    lng         REAL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_client_addresses_client
+    ON client_addresses(client_id);
+`);
+
+// Add client_id to tasks (nullable FK)
+try { db.exec(`ALTER TABLE tasks ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL`); } catch (_) {}
+try { db.exec(`ALTER TABLE tasks ADD COLUMN client_address_id INTEGER REFERENCES client_addresses(id) ON DELETE SET NULL`); } catch (_) {}
 
 // Seed default admin user if none exists
 const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
