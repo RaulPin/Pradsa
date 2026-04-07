@@ -94,31 +94,25 @@ router.put('/:id', (req, res) => {
 
   db.transaction(() => {
     if (req.user.role === 'admin') {
-      db.prepare(`
-        UPDATE tasks SET
-          title         = CASE WHEN ? IS NOT NULL THEN ? ELSE title END,
-          description   = CASE WHEN ? IS NOT NULL THEN ? ELSE description END,
-          assigned_to   = CASE WHEN ? IS NOT NULL THEN ? ELSE assigned_to END,
-          priority      = CASE WHEN ? IS NOT NULL THEN ? ELSE priority END,
-          status        = CASE WHEN ? IS NOT NULL THEN ? ELSE status END,
-          due_date      = CASE WHEN ? IS NOT NULL THEN ? ELSE due_date END,
-          location_name = CASE WHEN ? IS NOT NULL THEN ? ELSE location_name END,
-          location_lat  = CASE WHEN ? IS NOT NULL THEN ? ELSE location_lat END,
-          location_lng  = CASE WHEN ? IS NOT NULL THEN ? ELSE location_lng END,
-          updated_at    = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(
-        title ?? null, title ?? null,
-        description ?? null, description ?? null,
-        assigned_to ?? null, assigned_to ?? null,
-        priority ?? null, priority ?? null,
-        status ?? null, status ?? null,
-        due_date ?? null, due_date ?? null,
-        location_name ?? null, location_name ?? null,
-        location_lat ?? null, location_lat ?? null,
-        location_lng ?? null, location_lng ?? null,
-        id
-      );
+      // Build SET clause dynamically so that:
+      //   - fields absent from the request body are left unchanged
+      //   - fields explicitly sent (including null) are written as-is
+      const body = req.body || {};
+      const FIELDS = ['title', 'description', 'assigned_to', 'priority',
+                      'status', 'due_date', 'location_name', 'location_lat', 'location_lng'];
+      const sets = [];
+      const vals = [];
+      for (const field of FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(body, field)) {
+          sets.push(`${field} = ?`);
+          vals.push(body[field] ?? null);
+        }
+      }
+      if (sets.length > 0) {
+        sets.push('updated_at = CURRENT_TIMESTAMP');
+        vals.push(id);
+        db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+      }
     } else if (status) {
       // Employees can only update status
       db.prepare('UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')

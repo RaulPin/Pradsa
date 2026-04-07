@@ -8,7 +8,12 @@ const router = express.Router();
 router.use(auth);
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+  // Use local calendar date so clock-ins near midnight aren't assigned to the wrong day
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // GET /api/attendance  (admin: all employees, with optional ?date=&start=&end=)

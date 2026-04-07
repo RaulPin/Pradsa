@@ -3,7 +3,12 @@
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'pradsa_dev_secret_change_in_production';
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Set it before starting the server.');
+  process.exit(1);
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '8h';
 
 function auth(req, res, next) {
