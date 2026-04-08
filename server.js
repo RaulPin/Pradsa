@@ -16,6 +16,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const interviewRoutes = require('./src/routes/interviewRoutes');
 const reportRoutes = require('./src/routes/reportRoutes');
+const wordRoutes   = require('./src/routes/wordRoutes');
 const { setupSignaling } = require('./src/signaling');
 const { requireAuth } = require('./src/middleware/auth');
 
@@ -78,6 +79,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/report', reportRoutes);
+app.use('/export', wordRoutes);
 
 // Páginas HTML
 const htmlPages = {

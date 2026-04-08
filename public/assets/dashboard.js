@@ -1,10 +1,12 @@
 'use strict';
 
 // ─── Estado de la aplicación ──────────────────────────────────────────────────
-let currentUser = null;
-let interviews  = [];
+let currentUser  = null;
+let interviews   = [];
 let filterStatus = '';
 let filterType   = '';
+let searchQuery  = '';
+let searchTimer  = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 (async () => {
@@ -69,23 +71,33 @@ function initTabs() {
 function initFilters() {
   document.getElementById('filter-status').addEventListener('change', (e) => {
     filterStatus = e.target.value;
-    renderInterviews();
+    loadInterviews();
   });
   document.getElementById('filter-type').addEventListener('change', (e) => {
     filterType = e.target.value;
-    renderInterviews();
+    loadInterviews();
+  });
+  document.getElementById('search-input').addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchQuery = e.target.value.trim();
+      loadInterviews();
+    }, 350);
   });
 }
 
 // ─── Entrevistas ──────────────────────────────────────────────────────────────
 async function loadInterviews() {
   try {
-    interviews = await api('/api/interviews');
+    const params = new URLSearchParams();
+    if (searchQuery)  params.set('q',      searchQuery);
+    if (filterStatus) params.set('status', filterStatus);
+    if (filterType)   params.set('type',   filterType);
+    const qs = params.toString() ? `?${params}` : '';
+    interviews = await api(`/api/interviews${qs}`);
     renderInterviews();
 
-    if (currentUser?.role === 'admin') {
-      loadStats();
-    }
+    if (currentUser?.role === 'admin') loadStats();
   } catch (err) {
     console.error('Error cargando entrevistas', err);
   }
@@ -110,21 +122,19 @@ async function loadStats() {
 
 function renderInterviews() {
   const list = document.getElementById('interviews-list');
-  const filtered = interviews.filter((i) => {
-    if (filterStatus && i.status !== filterStatus) return false;
-    if (filterType   && i.type   !== filterType)   return false;
-    return true;
-  });
 
-  if (!filtered.length) {
+  if (!interviews.length) {
     list.innerHTML = '<p class="muted" style="padding:.5rem 0">No hay entrevistas para mostrar.</p>';
     return;
   }
 
-  list.innerHTML = filtered.map((i) => `
+  list.innerHTML = interviews.map((i) => `
     <div class="interview-card">
       <div class="ic-main">
-        <div class="ic-title">${esc(i.title)}</div>
+        <div class="ic-header-row">
+          ${i.folio ? `<span class="ic-folio">${esc(i.folio)}</span>` : ''}
+          <div class="ic-title">${esc(i.title)}</div>
+        </div>
         <div class="ic-meta">
           <span class="badge badge-${i.type}">${i.type === 'pyme' ? 'Pyme' : 'Fiduciario'}</span>
           <span class="badge badge-${i.status}">${statusLabel(i.status)}</span>

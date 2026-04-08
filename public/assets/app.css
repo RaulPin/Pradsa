@@ -202,8 +202,9 @@ select option { background: var(--bg-card); }
 }
 .section-header h2 { font-size: 1.15rem; }
 
-.filters { display: flex; gap: .5rem; flex-wrap: wrap; }
+.filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .filters select { min-width: 160px; width: auto; }
+.search-input { min-width: 220px; flex: 1; max-width: 340px; }
 
 /* Stats */
 .stats-row {
@@ -229,6 +230,8 @@ select option { background: var(--bg-card); }
 .interview-card:hover { border-color: rgba(59,130,246,.4); }
 
 .ic-main { flex: 1; min-width: 0; }
+.ic-header-row { display: flex; align-items: baseline; gap: .6rem; min-width: 0; }
+.ic-folio { font-size: .78rem; font-weight: 700; color: var(--primary); background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.25); border-radius: 4px; padding: .15rem .45rem; white-space: nowrap; flex-shrink: 0; }
 .ic-title { font-weight: 700; font-size: .97rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ic-meta  { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .35rem; }
 .ic-info  { font-size: .82rem; color: var(--muted); margin-top: .35rem; }

@@ -122,6 +122,11 @@ db.exec(`
   );
 `);
 
+// ─── Migraciones ─────────────────────────────────────────────────────────────
+// Agregar columna folio si no existe (migración no destructiva)
+try { db.exec('ALTER TABLE interviews ADD COLUMN folio TEXT'); } catch { /* ya existe */ }
+try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_interviews_folio ON interviews(folio) WHERE folio IS NOT NULL'); } catch { /* ya existe */ }
+
 // ─── Inicialización del administrador ────────────────────────────────────────
 (async () => {
   const existing = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();

@@ -5,26 +5,51 @@ const config = require('../config');
 const { sendInterviewInvite } = require('../utils/email');
 const audit = require('../utils/audit');
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function generateFolio(type) {
+  const year  = new Date().getFullYear();
+  const prefix = type === 'pyme' ? 'PYM' : 'FID';
+  const like   = `${prefix}-${year}-%`;
+  const last   = db.prepare(
+    "SELECT folio FROM interviews WHERE folio LIKE ? ORDER BY folio DESC LIMIT 1",
+  ).get(like);
+  let seq = 1;
+  if (last?.folio) {
+    const n = parseInt(last.folio.split('-')[2], 10);
+    if (!isNaN(n)) seq = n + 1;
+  }
+  return `${prefix}-${year}-${String(seq).padStart(3, '0')}`;
+}
+
 // ─── Entrevistas ─────────────────────────────────────────────────────────────
 
 function listInterviews(req, res) {
   const { userId, role } = req.user;
+  const { q, status, type } = req.query;
 
-  const interviews = role === 'admin'
-    ? db.prepare(`
-        SELECT i.*, u.name AS interviewer_name,
-               (SELECT COUNT(*) FROM photos WHERE interview_id=i.id) AS photo_count
-        FROM interviews i
-        JOIN users u ON i.scheduled_by=u.id
-        ORDER BY i.scheduled_at DESC
-      `).all()
-    : db.prepare(`
-        SELECT i.*,
-               (SELECT COUNT(*) FROM photos WHERE interview_id=i.id) AS photo_count
-        FROM interviews i
-        WHERE i.scheduled_by=?
-        ORDER BY i.scheduled_at DESC
-      `).all(userId);
+  const conditions = [];
+  const params     = [];
+
+  if (role !== 'admin') { conditions.push('i.scheduled_by=?'); params.push(userId); }
+  if (q) {
+    const term = `%${q}%`;
+    conditions.push('(i.folio LIKE ? OR i.title LIKE ? OR i.interviewee_name LIKE ? OR i.interviewee_email LIKE ?)');
+    params.push(term, term, term, term);
+  }
+  if (status) { conditions.push('i.status=?'); params.push(status); }
+  if (type)   { conditions.push('i.type=?');   params.push(type); }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const interviews = db.prepare(`
+    SELECT i.*, u.name AS interviewer_name,
+           (SELECT COUNT(*) FROM photos WHERE interview_id=i.id) AS photo_count
+    FROM interviews i
+    JOIN users u ON i.scheduled_by=u.id
+    ${where}
+    ORDER BY i.scheduled_at DESC
+  `).all(...params);
 
   return res.json(interviews);
 }
@@ -46,18 +71,19 @@ async function createInterview(req, res) {
 
   const id = uuidv4();
   const joinToken = uuidv4();
+  const folio = generateFolio(type);
   // El enlace es válido desde ahora hasta 48h después de la fecha programada
   const joinTokenExpiresAt = new Date(scheduledDate.getTime() + 48 * 60 * 60 * 1000).toISOString();
   const now = new Date().toISOString();
 
   db.prepare(`
     INSERT INTO interviews
-      (id, title, type, status, scheduled_by, scheduled_at, interviewee_name,
+      (id, folio, title, type, status, scheduled_by, scheduled_at, interviewee_name,
        interviewee_email, interviewee_phone, interviewee_address,
        join_token, join_token_expires_at, created_at, updated_at)
-    VALUES (?,?,?,'scheduled',?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,'scheduled',?,?,?,?,?,?,?,?,?,?)
   `).run(
-    id, String(title).trim(), type, req.user.userId,
+    id, folio, String(title).trim(), type, req.user.userId,
     scheduledDate.toISOString(),
     String(intervieweeName).trim(),
     String(intervieweeEmail).trim().toLowerCase(),
@@ -99,7 +125,7 @@ async function createInterview(req, res) {
 
   return res.status(201).json({
     success: true,
-    interview: { id, joinToken, joinUrl },
+    interview: { id, folio, joinToken, joinUrl },
     message: 'Entrevista creada. Se envió la invitación al entrevistado por correo.',
   });
 }

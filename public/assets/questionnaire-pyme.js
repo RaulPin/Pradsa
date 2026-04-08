@@ -65,6 +65,8 @@ let savedResponses = {};
   document.getElementById('btn-save-bottom').addEventListener('click', save);
   document.getElementById('btn-pdf').addEventListener('click', generatePDF);
   document.getElementById('btn-pdf-bottom').addEventListener('click', generatePDF);
+  document.getElementById('btn-word').addEventListener('click', downloadWord);
+  document.getElementById('btn-word-bottom').addEventListener('click', downloadWord);
 
   setInterval(save, 60000);
 })();
@@ -156,6 +158,15 @@ async function save() {
   } catch {
     statusEl.textContent = 'Error al guardar';
   }
+}
+
+// ─── Descargar Word ───────────────────────────────────────────────────────────
+async function downloadWord() {
+  await save();
+  const a = document.createElement('a');
+  a.href = `/export/pyme/${interviewId}`;
+  a.download = '';
+  a.click();
 }
 
 // ─── Generar PDF ──────────────────────────────────────────────────────────────
