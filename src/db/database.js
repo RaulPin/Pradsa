@@ -127,6 +127,9 @@ db.exec(`
 try { db.exec('ALTER TABLE interviews ADD COLUMN folio TEXT'); } catch { /* ya existe */ }
 try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_interviews_folio ON interviews(folio) WHERE folio IS NOT NULL'); } catch { /* ya existe */ }
 
+// Agregar columna recording_filename a interview_sessions
+try { db.exec('ALTER TABLE interview_sessions ADD COLUMN recording_filename TEXT'); } catch { /* ya existe */ }
+
 // ─── Inicialización del administrador ────────────────────────────────────────
 (async () => {
   const existing = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();

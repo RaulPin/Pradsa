@@ -3,6 +3,7 @@ const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
 const { requireAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const uploadRecording = upload.recording;
 const ctrl = require('../controllers/interviewController');
 const db = require('../db/database');
 
@@ -49,5 +50,6 @@ router.patch('/:id', ctrl.updateInterview);
 router.post('/:id/session/start', ctrl.startSession);
 router.post('/:id/photos', upload.single('photo'), ctrl.uploadPhoto);
 router.post('/:id/questionnaire', ctrl.saveQuestionnaire);
+router.post('/:id/recording', uploadRecording.single('recording'), ctrl.saveRecording);
 
 module.exports = router;

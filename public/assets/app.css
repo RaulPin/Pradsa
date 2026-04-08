@@ -400,6 +400,20 @@ select option { background: var(--bg-card); }
 .ctrl-icon  { font-size: 1.3rem; }
 .ctrl-label { font-size: .72rem; font-weight: 600; }
 
+/* Indicador REC */
+.rec-indicator {
+  position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
+  background: rgba(220,38,38,.9); color: #fff;
+  font-size: .8rem; font-weight: 700; letter-spacing: .08em;
+  padding: .3rem .75rem; border-radius: 99px;
+  display: flex; align-items: center; gap: .4rem; z-index: 200;
+}
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fff;
+  animation: blink 1s step-start infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
 /* ════════════════════════════════════════════════════════════
    JOIN PAGE (entrevistado)
 ══════════════════════════════════════════════════════════════ */

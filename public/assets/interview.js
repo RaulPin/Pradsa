@@ -13,6 +13,7 @@ let interviewType;
 let ws;
 let pc;
 let localStream;
+let remoteStream = null;
 let screenStream;
 let sessionId;
 let callStartTs;
@@ -21,6 +22,14 @@ let qualityInterval;
 let wsReconnectAttempt = 0;
 let wsReconnecting = false;
 let lastVideoStats = null;
+
+// ─── Grabación ────────────────────────────────────────────────────────────────
+let mediaRecorder  = null;
+let recordingChunks = [];
+let recordingCanvas = null;
+let recordingCtx    = null;
+let recordingAnimId = null;
+let audioCtx        = null;
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 const localVideo   = document.getElementById('local-video');
@@ -208,6 +217,7 @@ async function ensurePeerConnection() {
 
   pc.ontrack = ({ streams }) => {
     if (streams?.[0]) {
+      remoteStream = streams[0];
       remoteVideo.srcObject = streams[0];
       remotePlaceholder.hidden = true;
       remoteLabel.textContent = 'Entrevistado conectado';
@@ -220,6 +230,7 @@ async function ensurePeerConnection() {
       setConnStatus('connected');
       hideStatus();
       startQualityMonitor();
+      if (!mediaRecorder) startRecording();
     } else if (state === 'disconnected') {
       setConnStatus('disconnected');
       showStatus('Conexión inestable, intentando recuperar…');
@@ -358,8 +369,112 @@ function addPhotoThumb(filename) {
   photoGallery.prepend(div);
 }
 
+// ─── Grabación ────────────────────────────────────────────────────────────────
+function startRecording() {
+  if (!localStream) return;
+  if (!window.MediaRecorder) return; // navegador no soporta
+
+  try {
+    // Canvas compuesto 1280×360 (remoto izq + local der)
+    recordingCanvas = document.createElement('canvas');
+    recordingCanvas.width  = 1280;
+    recordingCanvas.height = 360;
+    recordingCtx = recordingCanvas.getContext('2d');
+
+    function drawFrame() {
+      recordingCtx.fillStyle = '#0f172a';
+      recordingCtx.fillRect(0, 0, 1280, 360);
+      if (remoteVideo.srcObject && remoteVideo.readyState >= 2) {
+        recordingCtx.drawImage(remoteVideo, 0, 0, 640, 360);
+      }
+      if (localVideo.srcObject && localVideo.readyState >= 2) {
+        recordingCtx.drawImage(localVideo, 640, 0, 640, 360);
+      }
+      // Etiquetas
+      recordingCtx.fillStyle = 'rgba(0,0,0,.45)';
+      recordingCtx.fillRect(0, 320, 640, 40);
+      recordingCtx.fillRect(640, 320, 640, 40);
+      recordingCtx.fillStyle = '#fff';
+      recordingCtx.font = '14px Arial';
+      recordingCtx.fillText('Entrevistado', 8, 345);
+      recordingCtx.fillText('Entrevistador', 648, 345);
+      // Timestamp
+      const now = new Date().toLocaleTimeString('es-MX');
+      recordingCtx.fillStyle = 'rgba(0,0,0,.35)';
+      recordingCtx.fillRect(1150, 4, 126, 22);
+      recordingCtx.fillStyle = '#fff';
+      recordingCtx.font = '12px Arial';
+      recordingCtx.fillText(now, 1154, 18);
+      recordingAnimId = requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+
+    // Mezcla de audio
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioDest = audioCtx.createMediaStreamDestination();
+
+    const localAudioTracks = localStream.getAudioTracks();
+    if (localAudioTracks.length > 0) {
+      audioCtx.createMediaStreamSource(new MediaStream(localAudioTracks)).connect(audioDest);
+    }
+    if (remoteStream?.getAudioTracks().length > 0) {
+      audioCtx.createMediaStreamSource(new MediaStream(remoteStream.getAudioTracks())).connect(audioDest);
+    }
+
+    const combined = new MediaStream([
+      ...recordingCanvas.captureStream(15).getVideoTracks(),
+      ...audioDest.stream.getAudioTracks(),
+    ]);
+
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+      ? 'video/webm;codecs=vp8,opus' : 'video/webm';
+
+    mediaRecorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 500_000 });
+    recordingChunks = [];
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordingChunks.push(e.data);
+    };
+
+    mediaRecorder.start(5000); // chunk cada 5s
+
+    // Indicador visual
+    const recDot = document.getElementById('rec-indicator');
+    if (recDot) recDot.hidden = false;
+  } catch (err) {
+    console.warn('[REC] No se pudo iniciar grabación:', err.message);
+  }
+}
+
+async function stopRecordingAndUpload() {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+
+  return new Promise((resolve) => {
+    mediaRecorder.onstop = async () => {
+      cancelAnimationFrame(recordingAnimId);
+      audioCtx?.close();
+
+      if (recordingChunks.length === 0) { resolve(); return; }
+
+      const blob = new Blob(recordingChunks, { type: 'video/webm' });
+      const statusEl = document.getElementById('call-status-bar');
+      if (statusEl) { statusEl.textContent = 'Subiendo grabación al servidor…'; statusEl.hidden = false; }
+
+      try {
+        const fd = new FormData();
+        fd.append('recording', blob, 'recording.webm');
+        await fetch(`/api/interviews/${interviewId}/recording`, { method: 'POST', body: fd });
+      } catch (e) {
+        console.warn('[REC] Error al subir grabación:', e.message);
+      }
+      resolve();
+    };
+    mediaRecorder.stop();
+  });
+}
+
 // ─── Finalizar llamada ────────────────────────────────────────────────────────
-function endCall(notify) {
+async function endCall(notify) {
   stopTimer();
   stopQualityMonitor();
   stopScreenShare();
@@ -372,6 +487,8 @@ function endCall(notify) {
   ws = null;
 
   resetPc();
+
+  await stopRecordingAndUpload();
 
   localStream?.getTracks().forEach((t) => t.stop());
   localStream = null;

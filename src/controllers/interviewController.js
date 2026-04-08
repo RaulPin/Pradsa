@@ -134,7 +134,12 @@ function getInterview(req, res) {
   const { id } = req.params;
   const { userId, role } = req.user;
 
-  const interview = db.prepare('SELECT * FROM interviews WHERE id=?').get(id);
+  const interview = db.prepare(`
+    SELECT i.*, u.name AS interviewer_name
+    FROM interviews i
+    JOIN users u ON i.scheduled_by = u.id
+    WHERE i.id=?
+  `).get(id);
   if (!interview) return res.status(404).json({ error: 'Entrevista no encontrada' });
   if (role !== 'admin' && interview.scheduled_by !== userId) {
     return res.status(403).json({ error: 'Acceso denegado' });
@@ -384,9 +389,35 @@ function getStats(req, res) {
   return res.json({ total: total.count, byStatus, byType, recent });
 }
 
+// ─── Guardar grabación de video ───────────────────────────────────────────────
+function saveRecording(req, res) {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo de video' });
+
+  const { id } = req.params;
+  const { userId, role } = req.user;
+
+  const interview = db.prepare('SELECT * FROM interviews WHERE id=?').get(id);
+  if (!interview) return res.status(404).json({ error: 'Entrevista no encontrada' });
+  if (role !== 'admin' && interview.scheduled_by !== userId) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+
+  const session = db
+    .prepare('SELECT id FROM interview_sessions WHERE interview_id=? ORDER BY created_at DESC LIMIT 1')
+    .get(id);
+
+  if (session) {
+    db.prepare('UPDATE interview_sessions SET recording_filename=? WHERE id=?')
+      .run(req.file.filename, session.id);
+  }
+
+  audit.log('RECORDING_SAVED', { userId, details: { interviewId: id, file: req.file.filename }, ip: req.ip });
+  return res.json({ success: true, filename: req.file.filename });
+}
+
 module.exports = {
   listInterviews, createInterview, getInterview, updateInterview,
   validateJoinToken, saveLocation, startSession,
   uploadPhoto, uploadPhotoPublic,
-  saveQuestionnaire, getStats,
+  saveQuestionnaire, getStats, saveRecording,
 };

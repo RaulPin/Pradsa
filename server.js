@@ -21,7 +21,7 @@ const { setupSignaling } = require('./src/signaling');
 const { requireAuth } = require('./src/middleware/auth');
 
 // Crear directorios requeridos
-['uploads/photos', 'data'].forEach((dir) => {
+['uploads/photos', 'uploads/recordings', 'data'].forEach((dir) => {
   const fullPath = path.join(__dirname, dir);
   if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
 });
@@ -71,8 +71,9 @@ app.use(cookieParser());
 // Archivos estáticos públicos
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 
-// Fotos – solo usuarios autenticados
+// Fotos y grabaciones – solo usuarios autenticados
 app.use('/uploads', requireAuth, express.static(path.join(__dirname, 'uploads')));
+app.use('/recordings', requireAuth, express.static(path.join(__dirname, 'uploads', 'recordings')));
 
 // Rutas API
 app.use('/api/auth', authRoutes);
@@ -89,6 +90,7 @@ const htmlPages = {
   '/join': 'join.html',
   '/questionnaire':      'questionnaire.html',
   '/questionnaire-pyme': 'questionnaire-pyme.html',
+  '/expediente':         'expediente.html',
 };
 
 Object.entries(htmlPages).forEach(([route, file]) => {

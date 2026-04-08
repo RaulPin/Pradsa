@@ -149,8 +149,9 @@ function renderInterviews() {
       <div class="ic-actions">
         ${i.status === 'scheduled' || i.status === 'in_progress'
           ? `<a href="/interview?id=${i.id}" class="btn btn-sm btn-primary">Iniciar</a>`
-          : `<a href="/interview?id=${i.id}" class="btn btn-sm btn-ghost">Ver</a>`
+          : `<a href="/interview?id=${i.id}" class="btn btn-sm btn-ghost">Sala</a>`
         }
+        <a href="/expediente?id=${i.id}" class="btn btn-sm btn-ghost" title="Ver expediente completo">📁 Expediente</a>
       </div>
     </div>
   `).join('');
