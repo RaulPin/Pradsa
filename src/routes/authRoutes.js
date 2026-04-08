@@ -1,7 +1,7 @@
 'use strict';
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
-const { login, changePassword, logout, me } = require('../controllers/authController');
+const { login, verifyOTP, changePassword, logout, me } = require('../controllers/authController');
 const { requireAuth } = require('../middleware/auth');
 
 const router = Router();
@@ -16,6 +16,7 @@ const authLimiter = rateLimit({
 });
 
 router.post('/login', authLimiter, login);
+router.post('/verify-otp', authLimiter, verifyOTP);
 router.post('/change-password', requireAuth, changePassword);
 router.post('/logout', requireAuth, logout);
 router.get('/me', requireAuth, me);

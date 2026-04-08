@@ -130,6 +130,24 @@ try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_interviews_folio ON intervi
 // Agregar columna recording_filename a interview_sessions
 try { db.exec('ALTER TABLE interview_sessions ADD COLUMN recording_filename TEXT'); } catch { /* ya existe */ }
 
+// Política de expiración de contraseñas (120 días)
+try { db.exec('ALTER TABLE users ADD COLUMN password_expires_at TEXT'); } catch { /* ya existe */ }
+
+// Tabla para OTP de doble factor (2FA por correo)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS login_otp (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    code       TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`);
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_otp_user ON login_otp(user_id)'); } catch { /* ya existe */ }
+
 // ─── Inicialización del administrador ────────────────────────────────────────
 (async () => {
   const existing = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();

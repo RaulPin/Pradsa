@@ -39,6 +39,27 @@
       </form>
     </div>
 
+    <!-- PANTALLA: Código OTP (2FA) -->
+    <div id="screen-otp" hidden>
+      <h2 class="auth-title">Verificación de identidad</h2>
+      <p class="auth-desc">Se ha enviado un código de 6 dígitos a tu correo electrónico registrado. Ingrésalo para continuar.</p>
+
+      <div id="otp-error" class="alert alert-error" hidden></div>
+
+      <form id="otp-form" novalidate>
+        <div class="field">
+          <label for="otp-code">Código de verificación</label>
+          <input id="otp-code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                 required placeholder="000000" autocomplete="one-time-code"
+                 style="font-size:1.5rem;letter-spacing:.3em;text-align:center;" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="btn-otp">Verificar código</button>
+        <button type="button" class="btn btn-ghost btn-full" id="btn-otp-back" style="margin-top:.5rem;">
+          ← Volver al inicio de sesión
+        </button>
+      </form>
+    </div>
+
     <!-- PANTALLA: Cambio de contraseña obligatorio (primer ingreso) -->
     <div id="screen-change-pw" hidden>
       <div class="alert alert-warning" style="margin-bottom:1.25rem;">

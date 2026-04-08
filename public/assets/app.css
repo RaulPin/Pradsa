@@ -206,6 +206,30 @@ select option { background: var(--bg-card); }
 .filters select { min-width: 160px; width: auto; }
 .search-input { min-width: 220px; flex: 1; max-width: 340px; }
 
+/* Banner expiración de contraseña */
+.pw-expiry-banner {
+  background: #fef9c3;
+  border-bottom: 1px solid #ca8a04;
+  color: #854d0e;
+  font-size: .9rem;
+  font-weight: 500;
+  padding: .6rem 1.5rem;
+  text-align: center;
+}
+.pw-expiry-banner.pw-expiry-critical {
+  background: #fee2e2;
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+/* OTP auth description */
+.auth-desc {
+  font-size: .9rem;
+  color: var(--muted);
+  margin: -.25rem 0 1.25rem;
+  line-height: 1.5;
+}
+
 /* Stats */
 .stats-row {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr));

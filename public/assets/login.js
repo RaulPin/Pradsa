@@ -2,16 +2,23 @@
 
 // ─── Elementos ────────────────────────────────────────────────────────────────
 const screenLogin    = document.getElementById('screen-login');
+const screenOTP      = document.getElementById('screen-otp');
 const screenChangePw = document.getElementById('screen-change-pw');
 const loginForm      = document.getElementById('login-form');
+const otpForm        = document.getElementById('otp-form');
 const changeForm     = document.getElementById('change-form');
 const loginError     = document.getElementById('login-error');
+const otpError       = document.getElementById('otp-error');
 const changeError    = document.getElementById('change-error');
 const changeSuccess  = document.getElementById('change-success');
 const btnLogin       = document.getElementById('btn-login');
+const btnOTP         = document.getElementById('btn-otp');
+const btnOTPBack     = document.getElementById('btn-otp-back');
 const btnChange      = document.getElementById('btn-change');
-
 const newPwInput     = document.getElementById('new-pw');
+
+// Estado temporal del flujo OTP
+let pendingOtpToken = null;
 
 // ─── Toggle visibilidad de contraseña ─────────────────────────────────────────
 document.querySelectorAll('.toggle-pw').forEach((btn) => {
@@ -24,7 +31,7 @@ document.querySelectorAll('.toggle-pw').forEach((btn) => {
   });
 });
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+// ─── Login (paso 1: contraseña) ───────────────────────────────────────────────
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   setAlert(loginError, null);
@@ -47,9 +54,28 @@ loginForm.addEventListener('submit', async (e) => {
     }
 
     if (data.firstLogin) {
-      // Mostrar pantalla de cambio obligatorio
+      // Primer ingreso o contraseña vencida → pantalla de cambio obligatorio
       screenLogin.hidden = true;
       screenChangePw.hidden = false;
+      if (data.passwordExpired) {
+        document.querySelector('#screen-change-pw .alert-warning strong').textContent = 'Contraseña vencida:';
+        document.querySelector('#screen-change-pw .alert-warning').querySelector('strong').nextSibling.textContent =
+          ' Tu contraseña ha expirado (política 120 días). Debes establecer una nueva para continuar.';
+      }
+    } else if (data.step === 'otp') {
+      // Segundo paso: código OTP
+      pendingOtpToken = data.otpToken;
+      document.getElementById('otp-code').value = '';
+      setAlert(otpError, null);
+      if (data.message) {
+        document.getElementById('otp-code').placeholder = '000000';
+        // Mostrar mensaje de destino debajo del título
+        const descEl = document.getElementById('otp-desc');
+        if (descEl) descEl.textContent = data.message;
+      }
+      screenLogin.hidden = true;
+      screenOTP.hidden = false;
+      document.getElementById('otp-code').focus();
     } else {
       window.location.replace('/dashboard');
     }
@@ -59,6 +85,50 @@ loginForm.addEventListener('submit', async (e) => {
     setLoading(btnLogin, false, 'Acceder');
   }
 });
+
+// ─── Verificar OTP (paso 2) ───────────────────────────────────────────────────
+otpForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setAlert(otpError, null);
+  setLoading(btnOTP, true, 'Verificando…');
+
+  const code = document.getElementById('otp-code').value.trim();
+
+  try {
+    const res  = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otpToken: pendingOtpToken, code }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setAlert(otpError, data.error || 'Código incorrecto');
+      // Si la sesión expiró o demasiados intentos → volver al login
+      if (res.status === 401 && data.error?.includes('Vuelve')) {
+        setTimeout(() => resetToLogin(), 2000);
+      }
+      return;
+    }
+
+    window.location.replace('/dashboard');
+  } catch {
+    setAlert(otpError, 'Error de red. Intenta nuevamente.');
+  } finally {
+    setLoading(btnOTP, false, 'Verificar código');
+  }
+});
+
+btnOTPBack.addEventListener('click', () => resetToLogin());
+
+function resetToLogin() {
+  pendingOtpToken = null;
+  screenOTP.hidden = true;
+  screenChangePw.hidden = true;
+  screenLogin.hidden = false;
+  setAlert(loginError, null);
+  setAlert(otpError, null);
+}
 
 // ─── Cambio de contraseña ─────────────────────────────────────────────────────
 changeForm.addEventListener('submit', async (e) => {

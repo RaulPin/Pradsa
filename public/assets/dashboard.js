@@ -26,6 +26,21 @@ let searchTimer  = null;
     roleBadge.textContent = me.role === 'admin' ? 'Admin' : 'Usuario';
     roleBadge.className = `badge badge-${me.role}`;
 
+    // Advertencia de expiración de contraseña
+    if (me.password_expires_at) {
+      const daysLeft = Math.ceil((new Date(me.password_expires_at) - Date.now()) / 86400000);
+      if (daysLeft <= 15) {
+        const banner = document.getElementById('pw-expiry-banner');
+        banner.hidden = false;
+        if (daysLeft <= 0) {
+          banner.textContent = '⚠️ Tu contraseña ha vencido. Deberás cambiarla en tu próximo inicio de sesión.';
+          banner.classList.add('pw-expiry-critical');
+        } else {
+          banner.textContent = `⚠️ Tu contraseña vencerá en ${daysLeft} día(s). Cámbiala pronto para evitar interrupciones.`;
+        }
+      }
+    }
+
     // Mostrar tabs de admin
     if (me.role === 'admin') {
       document.querySelectorAll('.admin-only').forEach((el) => { el.hidden = false; });

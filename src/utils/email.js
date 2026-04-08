@@ -86,4 +86,36 @@ async function sendInterviewInvite(to, intervieweeName, interviewTitle, schedule
   });
 }
 
-module.exports = { sendWelcomeEmail, sendInterviewInvite };
+async function sendOTPEmail(to, name, code) {
+  const t = getTransporter();
+  await t.sendMail({
+    from: config.smtp.from,
+    to,
+    subject: 'Código de verificación – EntrevistasPradsa',
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;padding:32px;border-radius:12px;">
+        <div style="background:#1e3a5f;padding:20px 24px;border-radius:8px;margin-bottom:24px;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;">EntrevistasPradsa</h1>
+        </div>
+        <p style="color:#1e293b;">Hola <strong>${name}</strong>,</p>
+        <p style="color:#1e293b;">Se ha solicitado un acceso a tu cuenta. Usa el siguiente código de verificación:</p>
+        <div style="text-align:center;margin:28px 0;">
+          <div style="display:inline-block;background:#ffffff;border:2px solid #1e3a5f;border-radius:12px;padding:20px 40px;">
+            <span style="font-family:monospace;font-size:36px;font-weight:bold;letter-spacing:8px;color:#1e3a5f;">${code}</span>
+          </div>
+        </div>
+        <div style="background:#fef9c3;border-left:4px solid #ca8a04;padding:12px 16px;border-radius:4px;margin-bottom:20px;">
+          <p style="margin:0;color:#854d0e;font-size:14px;">
+            <strong>⚠️ Importante:</strong> Este código es válido por <strong>10 minutos</strong> y solo puede usarse una vez.
+            Si no fuiste tú quien intentó ingresar, comunícalo de inmediato al administrador del sistema.
+          </p>
+        </div>
+        <p style="font-size:13px;color:#64748b;">Por seguridad, nunca compartas este código con nadie. EntrevistasPradsa jamás te lo solicitará.</p>
+        <hr style="margin:32px 0;border:none;border-top:1px solid #e2e8f0;">
+        <p style="font-size:12px;color:#94a3b8;">Este mensaje fue generado automáticamente. ISO 27001:2022.</p>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendWelcomeEmail, sendInterviewInvite, sendOTPEmail };
