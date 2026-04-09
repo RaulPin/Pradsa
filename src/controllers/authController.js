@@ -147,15 +147,19 @@ async function login(req, res) {
     VALUES (?, ?, ?, ?, 0, 0, ?)
   `).run(otpId, user.id, code, expires, now);
 
-  // Enviar correo (no bloquear si falla en desarrollo)
+  // En desarrollo: siempre imprimir el código en consola para facilitar pruebas
+  if (config.nodeEnv !== 'production') {
+    console.log(`\n${'─'.repeat(50)}`);
+    console.log(`  [2FA DEV] Código OTP para: ${user.email}`);
+    console.log(`  Código: ${code}  (válido 10 min)`);
+    console.log(`${'─'.repeat(50)}\n`);
+  }
+
+  // Enviar correo (no bloquear si falla)
   try {
     await sendOTPEmail(user.email, user.name, code);
   } catch (err) {
-    console.error('[2FA] Error enviando OTP:', err.message);
-    // En desarrollo: devolver el código en la respuesta para facilitar pruebas
-    if (config.nodeEnv !== 'production') {
-      console.log(`[2FA DEV] Código OTP para ${user.email}: ${code}`);
-    }
+    console.error('[2FA] Error enviando OTP por correo:', err.message);
   }
 
   // Token temporal para el paso OTP (15 min, solo sirve para verify-otp)
