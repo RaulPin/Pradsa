@@ -59,12 +59,12 @@ let savedResponses = {};
   }
 
   // Botones guardar
-  document.getElementById('btn-save').addEventListener('click', save);
-  document.getElementById('btn-save-bottom').addEventListener('click', save);
-  document.getElementById('btn-pdf').addEventListener('click', generatePDF);
-  document.getElementById('btn-pdf-bottom').addEventListener('click', generatePDF);
-  document.getElementById('btn-word').addEventListener('click', downloadWord);
-  document.getElementById('btn-word-bottom').addEventListener('click', downloadWord);
+  document.getElementById('btn-save').addEventListener('click',        async () => { validateQuestionnaire(); await save(); });
+  document.getElementById('btn-save-bottom').addEventListener('click', async () => { validateQuestionnaire(); await save(); });
+  document.getElementById('btn-pdf').addEventListener('click',         async () => { validateQuestionnaire(); await generatePDF(); });
+  document.getElementById('btn-pdf-bottom').addEventListener('click',  async () => { validateQuestionnaire(); await generatePDF(); });
+  document.getElementById('btn-word').addEventListener('click',        async () => { validateQuestionnaire(); await downloadWord(); });
+  document.getElementById('btn-word-bottom').addEventListener('click', async () => { validateQuestionnaire(); await downloadWord(); });
 
   // Auto-guardar cada 60 segundos
   setInterval(save, 60000);
@@ -190,6 +190,63 @@ async function generatePDF() {
   } catch { /* continuar */ }
 
   window.open(`/report/fiduciario/${interviewId}`, '_blank');
+}
+
+// ─── Validación de campos incompletos ────────────────────────────────────────
+function validateQuestionnaire() {
+  const container = document.querySelector('.q-container');
+
+  // Limpiar marcas previas
+  container.querySelectorAll('.field-invalid').forEach((el) => el.classList.remove('field-invalid'));
+
+  let count = 0;
+
+  // Inputs de texto, textareas, selects
+  container.querySelectorAll('input[name]:not([type="radio"]), textarea[name], select[name]').forEach((el) => {
+    if (!el.value.trim()) {
+      const wrap = el.closest('.field');
+      if (wrap && !wrap.classList.contains('field-invalid')) {
+        wrap.classList.add('field-invalid');
+        count++;
+      }
+    }
+  });
+
+  // Grupos de radio: marcar si ninguno está seleccionado
+  const seen = new Set();
+  container.querySelectorAll('input[type="radio"][name]').forEach((radio) => {
+    if (seen.has(radio.name)) return;
+    seen.add(radio.name);
+    const group = container.querySelectorAll(`input[type="radio"][name="${CSS.escape(radio.name)}"]`);
+    if (!Array.from(group).some((r) => r.checked)) {
+      const wrap = radio.closest('.field') || radio.closest('.q-checks') || radio.closest('.q-row-inline');
+      if (wrap && !wrap.classList.contains('field-invalid')) {
+        wrap.classList.add('field-invalid');
+        count++;
+      }
+    }
+  });
+
+  // Banner de advertencia
+  let banner = document.getElementById('q-incomplete-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'q-incomplete-banner';
+    banner.className = 'q-incomplete-banner';
+    banner.innerHTML = '<span class="q-banner-msg"></span>'
+      + '<button type="button" class="q-banner-close" title="Cerrar">✕</button>';
+    banner.querySelector('.q-banner-close').addEventListener('click', () => { banner.hidden = true; });
+    container.insertBefore(banner, container.firstChild);
+  }
+
+  if (count > 0) {
+    banner.querySelector('.q-banner-msg').textContent =
+      `⚠️ Hay ${count} campo(s) sin completar. El cuestionario se guardó de todas formas.`;
+    banner.hidden = false;
+    container.querySelector('.field-invalid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    banner.hidden = true;
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

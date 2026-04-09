@@ -222,6 +222,51 @@
   font-size: .82rem;
 }
 
+/* ── Validación incompleta ──────────────────────────────── */
+.q-incomplete-banner {
+  background: #fff3cd;
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-sm, 4px);
+  padding: .7rem 1rem;
+  color: #854d0e;
+  font-size: .88rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .25rem;
+}
+.q-incomplete-banner .q-banner-close {
+  background: none; border: none; cursor: pointer;
+  color: #854d0e; font-size: 1.1rem; line-height: 1; padding: 0; flex-shrink: 0;
+}
+
+/* Campos sin completar – fiduciario (.field) */
+.field.field-invalid label { color: var(--danger, #ef4444); }
+.field.field-invalid input,
+.field.field-invalid select,
+.field.field-invalid textarea {
+  border-color: var(--danger, #ef4444) !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.15);
+}
+
+/* Campos sin completar – pyme (.q-field) */
+.q-field.field-invalid > label { color: var(--danger, #ef4444); }
+.q-field.field-invalid input,
+.q-field.field-invalid select,
+.q-field.field-invalid textarea {
+  border-color: var(--danger, #ef4444) !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.15);
+}
+
+/* Grupos de radio sin selección */
+.q-checks.field-invalid,
+.q-row-inline.field-invalid {
+  outline: 2px solid var(--danger, #ef4444);
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+
 /* ── Acciones finales ──────────────────────────────────── */
 .q-actions {
   display: flex;
