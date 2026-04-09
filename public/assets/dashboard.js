@@ -26,6 +26,15 @@ let searchTimer  = null;
     roleBadge.textContent = me.role === 'admin' ? 'Admin' : 'Usuario';
     roleBadge.className = `badge badge-${me.role}`;
 
+    // Avatar con iniciales
+    const avatarEl = document.getElementById('sidebar-avatar');
+    if (avatarEl && me.name) {
+      const parts = me.name.trim().split(' ');
+      avatarEl.textContent = parts.length >= 2
+        ? (parts[0][0] + parts[1][0]).toUpperCase()
+        : parts[0].slice(0, 2).toUpperCase();
+    }
+
     // Advertencia de expiración de contraseña
     if (me.password_expires_at) {
       const daysLeft = Math.ceil((new Date(me.password_expires_at) - Date.now()) / 86400000);
@@ -63,23 +72,34 @@ let searchTimer  = null;
   }
 })();
 
-// ─── Tabs ─────────────────────────────────────────────────────────────────────
+// ─── Navegación lateral ───────────────────────────────────────────────────────
+const TAB_TITLES = {
+  'interviews':    'Entrevistas',
+  'new-interview': 'Nueva entrevista',
+  'users':         'Gestión de usuarios',
+  'audit':         'Log de auditoría',
+};
+
 function initTabs() {
-  document.querySelectorAll('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-tab]').forEach((item) => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach((s) => s.classList.remove('visible'));
-      tab.classList.add('active');
-      const target = document.getElementById(`tab-${tab.dataset.tab}`);
+      item.classList.add('active');
+      const target = document.getElementById(`tab-${item.dataset.tab}`);
       if (target) target.classList.add('visible');
 
-      if (tab.dataset.tab === 'users' && currentUser?.role === 'admin') loadUsers();
-      if (tab.dataset.tab === 'audit' && currentUser?.role === 'admin') loadAuditLogs();
+      // Actualizar título del topbar
+      const titleEl = document.getElementById('topbar-title');
+      if (titleEl) titleEl.textContent = TAB_TITLES[item.dataset.tab] || '';
+
+      if (item.dataset.tab === 'users' && currentUser?.role === 'admin') loadUsers();
+      if (item.dataset.tab === 'audit' && currentUser?.role === 'admin') loadAuditLogs();
     });
   });
 
-  // Activar primer tab
-  document.querySelector('.tab')?.click();
+  // Activar primer item
+  document.querySelector('.nav-item[data-tab]')?.click();
 }
 
 // ─── Filtros ──────────────────────────────────────────────────────────────────
