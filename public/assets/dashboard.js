@@ -223,6 +223,21 @@ function initNewInterviewForm() {
     e.preventDefault();
     setAlert(errEl, null);
     setAlert(successEl, null);
+
+    const ok = validateFields([
+      { el: document.getElementById('int-title'), label: 'El título' },
+      { el: document.getElementById('int-type'),  label: 'El tipo',
+        check: (el) => !!el.value },
+      { el: document.getElementById('int-date'),  label: 'La fecha y hora' },
+      { el: document.getElementById('int-name'),  label: 'El nombre del entrevistado' },
+      { el: document.getElementById('int-email'), label: 'El correo',
+        check: (el) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim()) },
+    ]);
+    if (!ok) {
+      setAlert(errEl, 'Completa los campos obligatorios antes de continuar.');
+      return;
+    }
+
     setLoading(btnCreate, true, 'Creando…');
 
     const body = {
@@ -305,6 +320,19 @@ function initUserManagement() {
     e.preventDefault();
     setAlert(errEl, null);
     setAlert(successEl, null);
+
+    const ok = validateFields([
+      { el: document.getElementById('usr-name'),  label: 'El nombre' },
+      { el: document.getElementById('usr-email'), label: 'El correo',
+        check: (el) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim()) },
+      { el: document.getElementById('usr-role'),  label: 'El rol',
+        check: (el) => !!el.value },
+    ]);
+    if (!ok) {
+      setAlert(errEl, 'Completa los campos obligatorios antes de continuar.');
+      return;
+    }
+
     setLoading(btnSave, true, 'Creando…');
 
     const body = {
@@ -422,6 +450,39 @@ function setAlert(el, msg) {
   if (!el) return;
   if (!msg) { el.hidden = true; el.textContent = ''; return; }
   el.textContent = msg; el.hidden = false;
+}
+
+// Validates an array of {el, label, check?} descriptors.
+// Marks each empty field red and returns false if any fail.
+// check(el) → bool (optional, defaults to non-empty value)
+function validateFields(fieldDefs) {
+  let valid = true;
+  fieldDefs.forEach(({ el, label, check }) => {
+    const fieldWrap = el.closest('.field');
+    const failed = check ? !check(el) : !el.value.trim();
+    if (fieldWrap) {
+      fieldWrap.classList.toggle('field-invalid', failed);
+      // Show/remove inline hint
+      let hint = fieldWrap.querySelector('.field-hint');
+      if (failed) {
+        if (!hint) { hint = document.createElement('span'); hint.className = 'field-hint'; fieldWrap.appendChild(hint); }
+        hint.textContent = `${label} es obligatorio.`;
+      } else if (hint) {
+        hint.remove();
+      }
+      // Clear invalid state as soon as the user starts correcting
+      if (failed) {
+        const clear = () => {
+          fieldWrap.classList.remove('field-invalid');
+          fieldWrap.querySelector('.field-hint')?.remove();
+        };
+        el.addEventListener('input',  clear, { once: true });
+        el.addEventListener('change', clear, { once: true });
+      }
+    }
+    if (failed) valid = false;
+  });
+  return valid;
 }
 
 function setLoading(btn, loading, text) {
