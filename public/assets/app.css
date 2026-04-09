@@ -24,6 +24,9 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Garantizar que [hidden] funcione aunque haya display:flex/grid en el elemento */
+[hidden] { display: none !important; }
+
 html { font-size: 15px; }
 
 body {
