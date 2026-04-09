@@ -169,10 +169,18 @@
 
         <div id="created-box" class="created-box" hidden>
           <h3>✅ Entrevista creada</h3>
-          <p>Se envió la invitación al entrevistado. También puedes compartir el enlace directamente:</p>
+          <p>Se envió la invitación al entrevistado por correo. Comparte también el enlace:</p>
           <div class="link-box">
             <input id="join-link" type="text" readonly />
             <button class="btn btn-sm btn-primary" id="btn-copy">Copiar</button>
+          </div>
+          <div style="margin-top:.65rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+            <a id="btn-whatsapp-create" class="btn btn-sm btn-whatsapp" target="_blank" rel="noopener noreferrer" hidden>
+              📱 Enviar por WhatsApp
+            </a>
+            <span id="wa-no-phone" class="muted" style="font-size:.8rem;display:none;">
+              (Agrega teléfono al crear la entrevista para compartir por WhatsApp)
+            </span>
           </div>
           <button class="btn btn-ghost btn-sm" id="btn-another" style="margin-top:1rem">Agendar otra entrevista</button>
         </div>

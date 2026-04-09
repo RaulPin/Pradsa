@@ -188,7 +188,8 @@ function renderInterviews() {
         ${i.join_token && (i.status === 'scheduled' || i.status === 'in_progress') ? `
           <button class="btn btn-sm btn-ghost btn-copy-link" data-token="${esc(i.join_token)}" title="Copiar enlace de invitación">
             🔗 Enlace
-          </button>` : ''}
+          </button>
+          ${waCardButton(i)}` : ''}
         <a href="/expediente?id=${i.id}" class="btn btn-sm btn-ghost" title="Ver expediente completo">📁 Expediente</a>
       </div>
     </div>
@@ -263,10 +264,26 @@ function initNewInterviewForm() {
         return;
       }
 
+      const joinUrl  = data.interview.joinUrl || '';
+      const waPhone  = formatWaPhone(body.intervieweePhone);
+
       form.reset();
       form.hidden = true;
       createdBox.hidden = false;
-      joinLinkEl.value = data.interview.joinUrl || '';
+      joinLinkEl.value = joinUrl;
+
+      // Botón WhatsApp
+      const waBtn    = document.getElementById('btn-whatsapp-create');
+      const waNoPhone = document.getElementById('wa-no-phone');
+      if (waPhone) {
+        const waText = buildWaMessage(body.intervieweeName, body.title, body.scheduledAt, joinUrl);
+        waBtn.href   = `https://wa.me/${waPhone}?text=${encodeURIComponent(waText)}`;
+        waBtn.hidden = false;
+        waNoPhone.style.display = 'none';
+      } else {
+        waBtn.hidden = true;
+        waNoPhone.style.display = '';
+      }
 
       if (data.warning) setAlert(errEl, data.warning);
       else setAlert(successEl, data.message || 'Entrevista creada.');
@@ -500,4 +517,40 @@ function fmtDate(iso) {
 
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+// ─── WhatsApp helpers ─────────────────────────────────────────────────────────
+
+// Normaliza el teléfono para wa.me (solo dígitos; añade 52 si son 10 dígitos mexicanos)
+function formatWaPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.length === 10 ? `52${digits}` : digits;
+}
+
+// Construye el mensaje de WhatsApp pre-llenado
+function buildWaMessage(name, title, scheduledAt, url) {
+  const dateStr = scheduledAt
+    ? new Date(scheduledAt).toLocaleString('es-MX', {
+        weekday: 'long', day: 'numeric', month: 'long',
+        year: 'numeric', hour: '2-digit', minute: '2-digit',
+      })
+    : '';
+  return `Hola *${name}*, has sido invitado/a a una entrevista de crédito con EntrevistasPradsa.\n\n`
+    + `📋 *${title}*\n`
+    + (dateStr ? `📅 ${dateStr}\n\n` : '\n')
+    + `🔗 Enlace de acceso:\n${url}\n\n`
+    + `_Para participar deberás permitir acceso a tu cámara, micrófono y ubicación GPS._`;
+}
+
+// Genera el botón WhatsApp para las tarjetas de entrevista
+function waCardButton(interview) {
+  const phone = formatWaPhone(interview.interviewee_phone);
+  if (!phone || !interview.join_token) return '';
+  const url = `${location.origin}/join?token=${interview.join_token}`;
+  const msg = buildWaMessage(interview.interviewee_name, interview.title, interview.scheduled_at, url);
+  return `<a class="btn btn-sm btn-whatsapp" target="_blank" rel="noopener noreferrer"
+    href="https://wa.me/${phone}?text=${encodeURIComponent(msg)}" title="Enviar enlace por WhatsApp">
+    📱 WA
+  </a>`;
 }

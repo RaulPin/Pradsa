@@ -156,7 +156,7 @@ function handleEndCall(ws, msg) {
       .run(now, endedBy, Math.max(0, duration), session.id);
   }
 
-  db.prepare("UPDATE interviews SET status='completed', updated_at=? WHERE id=?").run(now, ws.interviewId);
+  db.prepare("UPDATE interviews SET status='completed', join_token=NULL, updated_at=? WHERE id=?").run(now, ws.interviewId);
 
   // Notificar al par
   if (room) {
