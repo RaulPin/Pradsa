@@ -163,8 +163,7 @@ function renderInterviews() {
     return;
   }
 
-  list.innerHTML = interviews.map((i) => `
-    <div class="interview-card">
+  list.innerHTML = interviews.map((i) => `    <div class="interview-card">
       <div class="ic-main">
         <div class="ic-header-row">
           ${i.folio ? `<span class="ic-folio">${esc(i.folio)}</span>` : ''}
@@ -186,10 +185,27 @@ function renderInterviews() {
           ? `<a href="/interview?id=${i.id}" class="btn btn-sm btn-primary">Iniciar</a>`
           : `<a href="/interview?id=${i.id}" class="btn btn-sm btn-ghost">Sala</a>`
         }
+        ${i.join_token && (i.status === 'scheduled' || i.status === 'in_progress') ? `
+          <button class="btn btn-sm btn-ghost btn-copy-link" data-token="${esc(i.join_token)}" title="Copiar enlace de invitación">
+            🔗 Enlace
+          </button>` : ''}
         <a href="/expediente?id=${i.id}" class="btn btn-sm btn-ghost" title="Ver expediente completo">📁 Expediente</a>
       </div>
     </div>
   `).join('');
+
+  // Copiar enlace de invitación
+  list.querySelectorAll('.btn-copy-link').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const token = btn.dataset.token;
+      const url   = `${location.origin}/join?token=${token}`;
+      navigator.clipboard.writeText(url).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copiado';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      });
+    });
+  });
 }
 
 // ─── Nueva entrevista ──────────────────────────────────────────────────────────
