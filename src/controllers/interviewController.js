@@ -306,7 +306,7 @@ function uploadPhoto(req, res) {
 
   db.prepare(`
     INSERT INTO photos (id, interview_id, filename, captured_by, captured_at)
-    VALUES (?,?,'interviewer',?,?)
+    VALUES (?,?,?,'interviewer',?)
   `).run(photoId, id, req.file.filename, now);
 
   audit.log('PHOTO_CAPTURED', { userId, details: { interviewId: id, photoId }, ip: req.ip });

@@ -72,7 +72,7 @@ app.use(cookieParser());
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 
 // Fotos y grabaciones – solo usuarios autenticados
-app.use('/uploads', requireAuth, express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', requireAuth, express.static(path.join(__dirname, 'uploads', 'photos')));
 app.use('/recordings', requireAuth, express.static(path.join(__dirname, 'uploads', 'recordings')));
 
 // Rutas API
