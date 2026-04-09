@@ -586,3 +586,65 @@ function debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
+
+// ─── Cámara local arrastrable ─────────────────────────────────────────────────
+(function initDraggableLocalVideo() {
+  const cell = document.querySelector('.video-cell.local-cell');
+  const grid = document.querySelector('.video-grid');
+  if (!cell || !grid) return;
+
+  let dragging = false;
+  let startX, startY, startLeft, startBottom;
+
+  function onPointerDown(e) {
+    // Ignorar clicks en el video mismo para no interferir con controles
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    cell.classList.add('dragging');
+
+    const rect  = cell.getBoundingClientRect();
+    const gRect = grid.getBoundingClientRect();
+    startX      = e.clientX;
+    startY      = e.clientY;
+    startLeft   = rect.left - gRect.left;
+    startBottom = gRect.bottom - rect.bottom;
+
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const gRect = grid.getBoundingClientRect();
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;   // positivo = hacia abajo
+
+    let newLeft   = startLeft   + dx;
+    let newBottom = startBottom - dy;  // subir el cursor → bottom disminuye
+
+    // Limitar dentro del grid
+    const maxLeft   = gRect.width  - cell.offsetWidth  - 4;
+    const maxBottom = gRect.height - cell.offsetHeight - 4;
+    newLeft   = Math.max(4, Math.min(newLeft,   maxLeft));
+    newBottom = Math.max(4, Math.min(newBottom, maxBottom));
+
+    cell.style.left   = newLeft   + 'px';
+    cell.style.bottom = newBottom + 'px';
+    cell.style.right  = 'auto';
+    cell.style.top    = 'auto';
+  }
+
+  function onPointerUp() {
+    if (!dragging) return;
+    dragging = false;
+    cell.classList.remove('dragging');
+  }
+
+  cell.addEventListener('mousedown', onPointerDown);
+  document.addEventListener('mousemove', onPointerMove);
+  document.addEventListener('mouseup', onPointerUp);
+
+  // Touch support
+  cell.addEventListener('touchstart', (e) => onPointerDown(e.touches[0]), { passive: false });
+  document.addEventListener('touchmove', (e) => { if (dragging) { onPointerMove(e.touches[0]); e.preventDefault(); } }, { passive: false });
+  document.addEventListener('touchend', onPointerUp);
+})();
