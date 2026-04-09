@@ -17,15 +17,19 @@ let pc;
 let callStartTs;
 let timerInterval;
 let wsReconnectAttempt = 0;
-let wsReconnecting = false;
+let wsReconnecting     = false;
+let facingMode         = 'user';      // 'user' (frontal) | 'environment' (trasera)
+let hasMultipleCameras = false;
 
-// Permisos obtenidos
+// Permisos
 let permCamera   = false;
 let permMic      = false;
 let permLocation = false;
 let geoCoords    = null;
 
 // ─── Pantallas ────────────────────────────────────────────────────────────────
+const pageWrapper = document.getElementById('join-page-wrapper');
+
 const screens = {
   loading:     document.getElementById('screen-loading'),
   error:       document.getElementById('screen-error'),
@@ -36,6 +40,9 @@ const screens = {
 };
 
 function show(name) {
+  // Ocultar/mostrar el wrapper de tarjetas vs. la vista de llamada full-screen
+  pageWrapper.hidden = (name === 'call');
+
   Object.entries(screens).forEach(([k, el]) => {
     if (el) el.hidden = k !== name;
   });
@@ -50,23 +57,27 @@ function show(name) {
   if (!token) { showError('Enlace de entrevista inválido. Verifica el enlace que recibiste.'); return; }
 
   try {
-    const res = await fetch(`/api/interviews/join?token=${encodeURIComponent(token)}`);
+    const res  = await fetch(`/api/interviews/join?token=${encodeURIComponent(token)}`);
     const data = await res.json();
-
     if (!res.ok) { showError(data.error || 'Enlace inválido.'); return; }
 
     interviewData = data;
     interviewId   = data.id;
 
-    // Mostrar info en pantalla de permisos
     document.getElementById('interview-title-display').textContent = data.title;
+    document.getElementById('join-call-title').textContent         = data.title;
 
     if (data.declaredAddress) {
       document.getElementById('declared-address').textContent = data.declaredAddress;
-      document.getElementById('declared-address-box').hidden = false;
+      document.getElementById('declared-address-box').hidden  = false;
     }
 
-    document.getElementById('join-call-title').textContent = data.title;
+    // Detectar si hay más de una cámara (para mostrar botón voltear)
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter((d) => d.kind === 'videoinput');
+      hasMultipleCameras = cameras.length > 1;
+    } catch { hasMultipleCameras = false; }
 
     show('permissions');
     document.getElementById('btn-request-perms').addEventListener('click', requestPermissions);
@@ -78,45 +89,46 @@ function show(name) {
 // ─── Solicitar permisos ───────────────────────────────────────────────────────
 async function requestPermissions() {
   const errEl = document.getElementById('perm-error');
+  const btn   = document.getElementById('btn-request-perms');
   errEl.hidden = true;
-
-  const btn = document.getElementById('btn-request-perms');
   btn.disabled = true;
   btn.textContent = 'Solicitando permisos…';
 
   try {
-    // 1. Cámara + micrófono
+    // Cámara + micrófono
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+        audio: true,
+      });
       permCamera = true;
       permMic    = true;
       setPermStatus('status-camera', 'Concedido', 'perm-camera');
       setPermStatus('status-mic',    'Concedido', 'perm-mic');
-
-      // Preview
       document.getElementById('preview-video').srcObject = localStream;
     } catch (camErr) {
       if (camErr.name === 'NotAllowedError' || camErr.name === 'PermissionDeniedError') {
         setPermStatus('status-camera', 'Denegado', 'perm-camera', true);
         setPermStatus('status-mic',    'Denegado', 'perm-mic',    true);
         showPermError('Debes permitir el acceso a la cámara y micrófono para continuar.');
-        btn.disabled = false;
-        btn.textContent = 'Solicitar permisos e ingresar';
-        return;
+      } else {
+        showPermError('Error al acceder a la cámara: ' + (camErr.message || camErr));
       }
-      throw camErr;
+      btn.disabled = false;
+      btn.textContent = 'Solicitar permisos e ingresar';
+      return;
     }
 
-    // 2. Ubicación (obligatoria)
+    // Ubicación GPS
     try {
-      geoCoords = await new Promise((resolve, reject) => {
+      geoCoords = await new Promise((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true, timeout: 15000, maximumAge: 0,
-        });
-      });
+        })
+      );
       permLocation = true;
       setPermStatus('status-location', 'Concedido', 'perm-location');
-    } catch (geoErr) {
+    } catch {
       setPermStatus('status-location', 'Denegado', 'perm-location', true);
       showPermError('La ubicación GPS es obligatoria. Actívala en tu navegador e intenta de nuevo.');
       btn.disabled = false;
@@ -124,16 +136,16 @@ async function requestPermissions() {
       return;
     }
 
-    // Enviar ubicación al servidor
     await sendLocation();
 
-    // Verificar coincidencia con dirección declarada (informativo)
     if (interviewData.declaredAddress) {
-      // Solo mostramos un aviso – la decisión la toma el entrevistador
       document.getElementById('location-mismatch').hidden = false;
     }
 
-    // Todo OK → sala de espera
+    // Mostrar botón voltear en sala de espera
+    const flipWaiting = document.getElementById('btn-flip-waiting');
+    if (flipWaiting && hasMultipleCameras) flipWaiting.hidden = false;
+
     show('waiting');
     connectSignaling();
   } catch (err) {
@@ -143,13 +155,50 @@ async function requestPermissions() {
   }
 }
 
+// ─── Cambiar cámara (frontal ↔ trasera) ──────────────────────────────────────
+async function flipCamera() {
+  if (!localStream) return;
+
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+
+  try {
+    // Parar pista de video actual
+    localStream.getVideoTracks().forEach((t) => t.stop());
+
+    // Obtener nueva pista con el facing contrario
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode },
+      audio: false,
+    });
+    const newVideoTrack = newStream.getVideoTracks()[0];
+
+    // Reemplazar en localStream
+    localStream.getVideoTracks().forEach((t) => localStream.removeTrack(t));
+    localStream.addTrack(newVideoTrack);
+
+    // Actualizar elementos de video
+    const previewEl   = document.getElementById('preview-video');
+    const localCallEl = document.getElementById('join-local-video');
+    if (previewEl   && previewEl.srcObject)   previewEl.srcObject   = localStream;
+    if (localCallEl && localCallEl.srcObject) localCallEl.srcObject = localStream;
+
+    // Reemplazar pista en PeerConnection (sin renegociar)
+    if (pc) {
+      const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+      if (sender) await sender.replaceTrack(newVideoTrack);
+    }
+  } catch (err) {
+    console.warn('[flipCamera] Error:', err.message);
+    // Revertir facingMode si falla
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+  }
+}
+
+// ─── Enviar ubicación ─────────────────────────────────────────────────────────
 async function sendLocation() {
   if (!geoCoords) return;
   const { latitude, longitude } = geoCoords.coords;
-
-  // Intento de geocodificación inversa (sin API key, solo coords)
   const address = `Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}`;
-
   await fetch(`/api/interviews/join/location?token=${encodeURIComponent(token)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -157,20 +206,7 @@ async function sendLocation() {
   }).catch(() => {});
 }
 
-function setPermStatus(elId, text, rowId, denied = false) {
-  const el  = document.getElementById(elId);
-  const row = document.getElementById(rowId);
-  if (el)  { el.textContent = text; el.className = `perm-status ${denied ? 'denied' : 'granted'}`; }
-  if (row) { row.style.borderColor = denied ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.4)'; }
-}
-
-function showPermError(msg) {
-  const el = document.getElementById('perm-error');
-  el.textContent = msg;
-  el.hidden = false;
-}
-
-// ─── WebSocket de señalización ────────────────────────────────────────────────
+// ─── WebSocket ────────────────────────────────────────────────────────────────
 function connectSignaling() {
   wsReconnecting = false;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -180,19 +216,9 @@ function connectSignaling() {
     wsReconnectAttempt = 0;
     ws.send(JSON.stringify({ type: 'join', interviewId, authType: 'interviewee', token }));
   };
-
-  ws.onmessage = (ev) => {
-    const msg = safeParse(ev.data);
-    if (!msg) return;
-    handleSignal(msg);
-  };
-
-  ws.onclose = () => {
-    setJoinConnStatus('disconnected');
-    scheduleWsReconnect();
-  };
-
-  ws.onerror = () => setJoinConnStatus('disconnected');
+  ws.onmessage  = (ev) => { const m = safeParse(ev.data); if (m) handleSignal(m); };
+  ws.onclose    = () => { setJoinConnStatus('disconnected'); scheduleWsReconnect(); };
+  ws.onerror    = () => setJoinConnStatus('disconnected');
 }
 
 function scheduleWsReconnect() {
@@ -207,13 +233,15 @@ function scheduleWsReconnect() {
 // ─── Señalización WebRTC ──────────────────────────────────────────────────────
 async function handleSignal(msg) {
   switch (msg.type) {
-    case 'joined':
-      // En sala de espera hasta que llegue el entrevistador
-      break;
+    case 'joined': break;
 
     case 'peer_joined':
       show('call');
       document.getElementById('join-local-video').srcObject = localStream;
+      // Mostrar botón voltear en llamada
+      if (hasMultipleCameras) {
+        document.getElementById('join-btn-flip').style.display = '';
+      }
       setJoinConnStatus('connecting');
       await ensurePeerConnection();
       if (msg.initiator) {
@@ -262,12 +290,9 @@ async function handleSignal(msg) {
 // ─── Peer Connection ──────────────────────────────────────────────────────────
 async function ensurePeerConnection() {
   if (pc) return;
-
   pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-  pc.onicecandidate = ({ candidate }) => {
-    if (candidate) wsSend({ type: 'ice', candidate });
-  };
+  pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type: 'ice', candidate }); };
 
   pc.ontrack = ({ streams }) => {
     if (streams?.[0]) {
@@ -305,8 +330,9 @@ function resetPc() {
   pc = null;
 }
 
-// ─── Controles de la llamada (entrevistado) ───────────────────────────────────
-(function initJoinControls() {
+// ─── Controles ────────────────────────────────────────────────────────────────
+(function initControls() {
+  // Silenciar
   document.getElementById('join-btn-mute')?.addEventListener('click', () => {
     const t = localStream?.getAudioTracks()[0];
     if (!t) return;
@@ -316,6 +342,7 @@ function resetPc() {
     btn.querySelector('.ctrl-label').textContent = t.enabled ? 'Silenciar' : 'Activar mic';
   });
 
+  // Cámara on/off
   document.getElementById('join-btn-video')?.addEventListener('click', () => {
     const t = localStream?.getVideoTracks()[0];
     if (!t) return;
@@ -325,6 +352,18 @@ function resetPc() {
     btn.querySelector('.ctrl-label').textContent = t.enabled ? 'Cámara' : 'Sin cámara';
   });
 
+  // Voltear cámara (llamada)
+  const btnFlip = document.getElementById('join-btn-flip');
+  if (btnFlip) {
+    // Ocultar si no hay múltiples cámaras; se muestra al hacer show('call')
+    if (!hasMultipleCameras) btnFlip.style.display = 'none';
+    btnFlip.addEventListener('click', flipCamera);
+  }
+
+  // Voltear cámara (sala de espera)
+  document.getElementById('btn-flip-waiting')?.addEventListener('click', flipCamera);
+
+  // Finalizar
   document.getElementById('join-btn-end')?.addEventListener('click', () => {
     if (confirm('¿Deseas finalizar la entrevista?')) {
       wsSend({ type: 'end_call' });
@@ -332,9 +371,7 @@ function resetPc() {
     }
   });
 
-  window.addEventListener('beforeunload', () => {
-    wsSend({ type: 'leave' });
-  });
+  window.addEventListener('beforeunload', () => wsSend({ type: 'leave' }));
 })();
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
@@ -342,9 +379,9 @@ function startTimer() {
   callStartTs = Date.now();
   timerInterval = setInterval(() => {
     const sec = Math.floor((Date.now() - callStartTs) / 1000);
-    const m = String(Math.floor(sec / 60)).padStart(2, '0');
-    const s = String(sec % 60).padStart(2, '0');
-    const el = document.getElementById('join-timer');
+    const m   = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s   = String(sec % 60).padStart(2, '0');
+    const el  = document.getElementById('join-timer');
     if (el) el.textContent = `${m}:${s}`;
   }, 1000);
 }
@@ -352,12 +389,10 @@ function startTimer() {
 // ─── Finalizar ────────────────────────────────────────────────────────────────
 function endCall(msg) {
   clearInterval(timerInterval);
-  ws?.close();
-  ws = null;
+  ws?.close(); ws = null;
   resetPc();
   localStream?.getTracks().forEach((t) => t.stop());
   localStream = null;
-
   document.getElementById('ended-message').textContent = msg;
   show('ended');
 }
@@ -366,6 +401,18 @@ function endCall(msg) {
 function showError(msg) {
   document.getElementById('error-message').textContent = msg;
   show('error');
+}
+
+function setPermStatus(elId, text, rowId, denied = false) {
+  const el  = document.getElementById(elId);
+  const row = document.getElementById(rowId);
+  if (el)  { el.textContent = text; el.className = `perm-status ${denied ? 'denied' : 'granted'}`; }
+  if (row) { row.style.borderColor = denied ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.4)'; }
+}
+
+function showPermError(msg) {
+  const el = document.getElementById('perm-error');
+  el.textContent = msg; el.hidden = false;
 }
 
 function setJoinConnStatus(state) {
