@@ -1,18 +1,30 @@
 {
-  "name": "homepty",
-  "version": "1.0.0",
-  "description": "Aplicación web de entrevistas 1 a 1 con videollamada WebRTC y servidor de señalización minimalista.",
+  "name": "pradsa",
+  "version": "2.0.0",
+  "description": "Plataforma de monitoreo de personal y asignación de tareas.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "keywords": [
-    "webrtc",
-    "video",
-    "interview",
-    "signaling"
+    "employee",
+    "monitoring",
+    "tasks",
+    "geolocation"
   ],
   "author": "",
   "license": "MIT",
-  "type": "commonjs"
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "pdfkit": "^0.18.0"
+  }
 }

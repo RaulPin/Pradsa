@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Pradsa",
+    "slug": "pradsa-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2563eb"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pradsa.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Pradsa necesita acceso a tu ubicación para registrar asistencia y reportar tu posición.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Pradsa necesita acceso a tu ubicación en segundo plano para reportar tu posición periódicamente.",
+        "NSLocationAlwaysUsageDescription": "Pradsa necesita acceso a tu ubicación en segundo plano para reportar tu posición periódicamente."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563eb"
+      },
+      "package": "com.pradsa.mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pradsa necesita acceso a tu galería para subir fotos.",
+          "cameraPermission": "Pradsa necesita acceso a tu cámara para tomar fotos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Pradsa necesita acceso a tu ubicación para registrar asistencia y reportar tu posición periódicamente.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ]
+  }
+}
