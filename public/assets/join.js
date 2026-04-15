@@ -108,9 +108,9 @@ async function requestPermissions() {
       localStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode,
-          width:     { ideal: 1280 },
-          height:    { ideal: 720 },
-          frameRate: { ideal: 30 },
+          width:     { ideal: 3840 },
+          height:    { ideal: 2160 },
+          frameRate: { ideal: 60 },
         },
         audio: true,
       });
