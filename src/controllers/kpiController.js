@@ -1,8 +1,104 @@
 'use strict';
-const XLSX = require('xlsx');
-const db   = require('../db/database');
+const XLSX   = require('xlsx');
+const db     = require('../db/database');
+const fs     = require('fs');
+const path   = require('path');
+const config = require('../config');
 
 function getDb() { return db; }
+
+// ─── Purga de registros antiguos ────────────────────────────────────────────
+
+function getCutoffDate(months = 3) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString();
+}
+
+module.exports.getPurgeSummary = function getPurgeSummary(req, res) {
+  const cutoff = getCutoffDate(3);
+  const d = getDb();
+
+  const interviews = d.prepare(
+    `SELECT COUNT(*) AS total FROM interviews WHERE created_at < ?`
+  ).get(cutoff);
+
+  const photos = d.prepare(`
+    SELECT COUNT(*) AS total FROM photos p
+    JOIN interviews i ON i.id = p.interview_id
+    WHERE i.created_at < ?
+  `).get(cutoff);
+
+  const sessions = d.prepare(`
+    SELECT COUNT(*) AS total FROM interview_sessions s
+    JOIN interviews i ON i.id = s.interview_id
+    WHERE i.created_at < ?
+  `).get(cutoff);
+
+  const questionnaires = d.prepare(`
+    SELECT COUNT(*) AS total FROM questionnaire_responses q
+    JOIN interviews i ON i.id = q.interview_id
+    WHERE i.created_at < ?
+  `).get(cutoff);
+
+  res.json({
+    cutoff,
+    interviews:     interviews.total,
+    photos:         photos.total,
+    sessions:       sessions.total,
+    questionnaires: questionnaires.total,
+  });
+};
+
+module.exports.purgeOldRecords = function purgeOldRecords(req, res) {
+  const cutoff = getCutoffDate(3);
+  const d = getDb();
+
+  // Obtener filenames de fotos a borrar
+  const photoFiles = d.prepare(`
+    SELECT p.filename FROM photos p
+    JOIN interviews i ON i.id = p.interview_id
+    WHERE i.created_at < ?
+  `).all(cutoff);
+
+  // Borrar archivos físicos
+  let filesDeleted = 0;
+  for (const { filename } of photoFiles) {
+    const filePath = path.join(config.uploadDir, filename);
+    try {
+      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); filesDeleted++; }
+    } catch { /* ignorar si ya no existe */ }
+  }
+
+  // Borrar registros en orden (respetando FK sin CASCADE)
+  const purge = d.transaction(() => {
+    const q = d.prepare(`
+      DELETE FROM questionnaire_responses WHERE interview_id IN
+      (SELECT id FROM interviews WHERE created_at < ?)
+    `).run(cutoff);
+
+    const p = d.prepare(`
+      DELETE FROM photos WHERE interview_id IN
+      (SELECT id FROM interviews WHERE created_at < ?)
+    `).run(cutoff);
+
+    const s = d.prepare(`
+      DELETE FROM interview_sessions WHERE interview_id IN
+      (SELECT id FROM interviews WHERE created_at < ?)
+    `).run(cutoff);
+
+    const i = d.prepare(
+      `DELETE FROM interviews WHERE created_at < ?`
+    ).run(cutoff);
+
+    return { interviews: i.changes, photos: p.changes, sessions: s.changes, questionnaires: q.changes };
+  });
+
+  const result = purge();
+  console.log(`[PURGE] Registros eliminados (antigüedad > 3 meses):`, result, `| Archivos: ${filesDeleted}`);
+
+  res.json({ success: true, cutoff, filesDeleted, ...result });
+};
 
 module.exports.downloadKpiExcel = function downloadKpiExcel(req, res) {
   const d = getDb();

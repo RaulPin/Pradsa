@@ -573,3 +573,48 @@ async function loadKpiSummary() {
 document.getElementById('btn-download-kpi')?.addEventListener('click', () => {
   window.location.href = '/report/kpi/excel';
 });
+
+// ─── Purga de registros antiguos ─────────────────────────────────────────────
+(function initPurge() {
+  const modal   = document.getElementById('purge-modal');
+  const summary = document.getElementById('purge-summary');
+
+  document.getElementById('btn-purge-open')?.addEventListener('click', async () => {
+    summary.textContent = 'Calculando…';
+    modal.style.display = 'flex';
+    try {
+      const data = await apiFetch('/report/kpi/purge-summary');
+      const cutDate = new Date(data.cutoff).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' });
+      summary.innerHTML = `
+        <strong>Registros anteriores al ${cutDate}:</strong><br>
+        • Entrevistas: <b>${data.interviews}</b><br>
+        • Fotos (archivos): <b>${data.photos}</b><br>
+        • Sesiones: <b>${data.sessions}</b><br>
+        • Cuestionarios: <b>${data.questionnaires}</b>
+      `;
+    } catch {
+      summary.textContent = 'Error al obtener resumen.';
+    }
+  });
+
+  document.getElementById('btn-purge-cancel')?.addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+
+  document.getElementById('btn-purge-confirm')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-purge-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Eliminando…';
+    try {
+      const result = await apiFetch('/report/kpi/purge', { method: 'DELETE' });
+      modal.style.display = 'none';
+      alert(`✅ Purga completada:\n• Entrevistas: ${result.interviews}\n• Fotos: ${result.photos}\n• Archivos eliminados: ${result.filesDeleted}\n• Sesiones: ${result.sessions}\n• Cuestionarios: ${result.questionnaires}`);
+      loadKpiSummary();
+    } catch {
+      alert('Error al purgar registros. Intenta de nuevo.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Eliminar permanentemente';
+    }
+  });
+})();

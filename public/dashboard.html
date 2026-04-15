@@ -257,9 +257,25 @@
               Descarga el informe completo en Excel con todas las métricas de operación.
             </p>
           </div>
-          <button class="btn btn-primary" id="btn-download-kpi">
-            ⬇ Descargar Excel
-          </button>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="btn-download-kpi">⬇ Descargar Excel</button>
+            <button class="btn btn-ghost" id="btn-purge-open" style="color:#ef4444;border-color:#ef4444">🗑 Purgar registros &gt;3 meses</button>
+          </div>
+        </div>
+
+        <!-- Modal purga -->
+        <div id="purge-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:12px;padding:2rem;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+            <h3 style="margin:0 0 .5rem;color:#ef4444">⚠️ Purgar registros antiguos</h3>
+            <p style="color:#475569;font-size:.9rem;margin-bottom:1rem">
+              Se eliminarán permanentemente todos los registros con más de <strong>3 meses de antigüedad</strong>. Esta acción no se puede deshacer.
+            </p>
+            <div id="purge-summary" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-bottom:1.25rem;font-size:.88rem;color:#334155"></div>
+            <div style="display:flex;gap:.75rem;justify-content:flex-end">
+              <button class="btn btn-ghost" id="btn-purge-cancel">Cancelar</button>
+              <button class="btn" id="btn-purge-confirm" style="background:#ef4444;color:#fff;border-color:#ef4444">Eliminar permanentemente</button>
+            </div>
+          </div>
         </div>
 
         <div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
