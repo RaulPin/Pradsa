@@ -4,6 +4,14 @@
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  {
+    urls: [
+      'turn:pradsavisitasvirtuales.com.mx:3478',
+      'turns:pradsavisitasvirtuales.com.mx:5349',
+    ],
+    username: 'pradsa',
+    credential: 'TurnPradsa2026',
+  },
 ];
 const WS_RECONNECT_DELAYS = [2000, 4000, 8000, 16000, 30000];
 
