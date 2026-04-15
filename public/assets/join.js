@@ -106,7 +106,12 @@ async function requestPermissions() {
     // Cámara + micrófono
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: {
+          facingMode,
+          width:     { ideal: 1280 },
+          height:    { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
         audio: true,
       });
       permCamera = true;
@@ -175,7 +180,12 @@ async function flipCamera() {
 
     // Obtener nueva pista con el facing contrario
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode },
+      video: {
+        facingMode,
+        width:     { ideal: 1280 },
+        height:    { ideal: 720 },
+        frameRate: { ideal: 30 },
+      },
       audio: false,
     });
     const newVideoTrack = newStream.getVideoTracks()[0];
