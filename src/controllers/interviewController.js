@@ -415,9 +415,43 @@ function saveRecording(req, res) {
   return res.json({ success: true, filename: req.file.filename });
 }
 
+function getKpiSummary(req, res) {
+  const totals = db.prepare(`
+    SELECT
+      COUNT(*)                                               AS total,
+      SUM(CASE WHEN status='completed'   THEN 1 ELSE 0 END) AS completadas,
+      SUM(CASE WHEN status='cancelled'   THEN 1 ELSE 0 END) AS canceladas
+    FROM interviews
+  `).get();
+
+  const avgDur = db.prepare(`
+    SELECT ROUND(AVG(duration_seconds),0) AS avg_seg
+    FROM interview_sessions WHERE duration_seconds IS NOT NULL
+  `).get();
+
+  const fotos = db.prepare('SELECT COUNT(*) AS total FROM photos').get();
+
+  const tasa = totals.total > 0
+    ? ((totals.completadas / totals.total) * 100).toFixed(1) + '%'
+    : '0%';
+
+  const avg = avgDur.avg_seg
+    ? `${Math.floor(avgDur.avg_seg / 60)}m ${avgDur.avg_seg % 60}s`
+    : 'N/A';
+
+  return res.json({
+    total:       totals.total,
+    completadas: totals.completadas,
+    canceladas:  totals.canceladas,
+    tasa,
+    duracion:    avg,
+    fotos:       fotos.total,
+  });
+}
+
 module.exports = {
   listInterviews, createInterview, getInterview, updateInterview,
   validateJoinToken, saveLocation, startSession,
   uploadPhoto, uploadPhotoPublic,
-  saveQuestionnaire, getStats, saveRecording,
+  saveQuestionnaire, getStats, getKpiSummary, saveRecording,
 };

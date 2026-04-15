@@ -254,7 +254,7 @@ select option { background: var(--bg-card); }
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 1rem 1.25rem; text-align: center;
 }
-.stat-num  { font-size: 2rem; font-weight: 800; color: var(--primary); }
+.stat-num, .stat-value { font-size: 2rem; font-weight: 800; color: var(--primary); }
 .stat-label { font-size: .8rem; color: var(--muted); margin-top: .2rem; }
 
 /* Tarjetas de entrevistas */

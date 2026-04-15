@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const uploadRecording = upload.recording;
 const ctrl = require('../controllers/interviewController');
+const { requireAdmin } = require('../middleware/auth');
 const db = require('../db/database');
 
 const router = Router();
@@ -44,7 +45,8 @@ router.use(requireAuth);
 
 router.get('/', ctrl.listInterviews);
 router.post('/', ctrl.createInterview);
-router.get('/stats', ctrl.getStats);
+router.get('/stats',       ctrl.getStats);
+router.get('/kpi-summary', requireAdmin, ctrl.getKpiSummary);
 router.get('/:id', ctrl.getInterview);
 router.patch('/:id', ctrl.updateInterview);
 router.post('/:id/session/start', ctrl.startSession);

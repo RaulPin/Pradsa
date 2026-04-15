@@ -77,6 +77,7 @@ const TAB_TITLES = {
   'interviews':    'Entrevistas',
   'new-interview': 'Nueva entrevista',
   'users':         'Gestión de usuarios',
+  'kpi':           'Reportes KPI',
   'audit':         'Log de auditoría',
 };
 
@@ -95,6 +96,7 @@ function initTabs() {
 
       if (item.dataset.tab === 'users' && currentUser?.role === 'admin') loadUsers();
       if (item.dataset.tab === 'audit' && currentUser?.role === 'admin') loadAuditLogs();
+      if (item.dataset.tab === 'kpi'   && currentUser?.role === 'admin') loadKpiSummary();
     });
   });
 
@@ -554,3 +556,20 @@ function waCardButton(interview) {
     📱 WA
   </a>`;
 }
+
+// ─── KPI Summary ─────────────────────────────────────────────────────────────
+async function loadKpiSummary() {
+  try {
+    const data = await apiFetch('/api/interviews/kpi-summary');
+    document.getElementById('kpi-val-total').textContent       = data.total       ?? '—';
+    document.getElementById('kpi-val-completadas').textContent = data.completadas  ?? '—';
+    document.getElementById('kpi-val-canceladas').textContent  = data.canceladas   ?? '—';
+    document.getElementById('kpi-val-tasa').textContent        = data.tasa         ?? '—';
+    document.getElementById('kpi-val-duracion').textContent    = data.duracion     ?? '—';
+    document.getElementById('kpi-val-fotos').textContent       = data.fotos        ?? '—';
+  } catch { /* silencioso */ }
+}
+
+document.getElementById('btn-download-kpi')?.addEventListener('click', () => {
+  window.location.href = '/report/kpi/excel';
+});

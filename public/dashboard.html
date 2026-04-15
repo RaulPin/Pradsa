@@ -47,6 +47,14 @@
         Usuarios
       </button>
 
+      <button class="nav-item admin-only" data-tab="kpi" hidden>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+        </svg>
+        Reportes KPI
+      </button>
+
       <button class="nav-item admin-only" data-tab="audit" hidden>
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -238,6 +246,48 @@
           </table>
         </div>
 
+      </section>
+
+      <!-- ── Reportes KPI (admin) ─────────────────────────────────── -->
+      <section id="tab-kpi" class="tab-content">
+        <div class="section-header" style="margin-bottom:1.5rem">
+          <div>
+            <h2 style="font-size:1.1rem;margin:0">Reportes de KPI</h2>
+            <p style="color:var(--muted);font-size:.85rem;margin:.25rem 0 0">
+              Descarga el informe completo en Excel con todas las métricas de operación.
+            </p>
+          </div>
+          <button class="btn btn-primary" id="btn-download-kpi">
+            ⬇ Descargar Excel
+          </button>
+        </div>
+
+        <div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+          <div class="stat-card" id="kpi-total">
+            <div class="stat-label">Total entrevistas</div>
+            <div class="stat-value" id="kpi-val-total">—</div>
+          </div>
+          <div class="stat-card" id="kpi-completadas">
+            <div class="stat-label">Completadas</div>
+            <div class="stat-value" id="kpi-val-completadas">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Tasa de completitud</div>
+            <div class="stat-value" id="kpi-val-tasa">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Duración promedio</div>
+            <div class="stat-value" id="kpi-val-duracion">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Fotos capturadas</div>
+            <div class="stat-value" id="kpi-val-fotos">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Canceladas</div>
+            <div class="stat-value" id="kpi-val-canceladas">—</div>
+          </div>
+        </div>
       </section>
 
       <!-- ── Auditoría (admin) ──────────────────────────────────── -->
