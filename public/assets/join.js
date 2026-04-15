@@ -94,6 +94,40 @@ function show(name) {
   }
 })();
 
+// ─── Canvas stream – bypasea límite 720p de WebRTC en Android ────────────────
+function buildCanvasStream(rawStream) {
+  return new Promise((resolve) => {
+    const videoTrack = rawStream.getVideoTracks()[0];
+    const settings   = videoTrack.getSettings();
+    const W = settings.width  || 1920;
+    const H = settings.height || 1080;
+
+    const hiddenVideo = document.createElement('video');
+    hiddenVideo.srcObject = new MediaStream([videoTrack]);
+    hiddenVideo.muted  = true;
+    hiddenVideo.playsInline = true;
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d', { alpha: false });
+
+    hiddenVideo.addEventListener('loadedmetadata', () => {
+      hiddenVideo.play();
+      (function draw() {
+        ctx.drawImage(hiddenVideo, 0, 0, W, H);
+        requestAnimationFrame(draw);
+      })();
+      const canvasStream = canvas.captureStream(30);
+      const combined = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...rawStream.getAudioTracks(),
+      ]);
+      resolve(combined);
+    }, { once: true });
+  });
+}
+
 // ─── Solicitar permisos ───────────────────────────────────────────────────────
 async function requestPermissions() {
   const errEl = document.getElementById('perm-error');
@@ -105,20 +139,22 @@ async function requestPermissions() {
   try {
     // Cámara + micrófono
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({
+      const rawStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode,
           width:     { ideal: 3840 },
           height:    { ideal: 2160 },
-          frameRate: { ideal: 60 },
+          frameRate: { ideal: 30 },
         },
         audio: true,
       });
+      // Canvas stream: bypasea el límite de 720p de WebRTC en Android
+      localStream = await buildCanvasStream(rawStream);
       permCamera = true;
       permMic    = true;
       setPermStatus('status-camera', 'Concedido', 'perm-camera');
       setPermStatus('status-mic',    'Concedido', 'perm-mic');
-      document.getElementById('preview-video').srcObject = localStream;
+      document.getElementById('preview-video').srcObject = rawStream;
     } catch (camErr) {
       if (camErr.name === 'NotAllowedError' || camErr.name === 'PermissionDeniedError') {
         setPermStatus('status-camera', 'Denegado', 'perm-camera', true);
@@ -179,26 +215,27 @@ async function flipCamera() {
     localStream.getVideoTracks().forEach((t) => t.stop());
 
     // Obtener nueva pista con el facing contrario
-    const newStream = await navigator.mediaDevices.getUserMedia({
+    const newRaw = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode,
-        width:     { ideal: 1280 },
-        height:    { ideal: 720 },
+        width:     { ideal: 3840 },
+        height:    { ideal: 2160 },
         frameRate: { ideal: 30 },
       },
       audio: false,
     });
-    const newVideoTrack = newStream.getVideoTracks()[0];
+    const newCanvasStream = await buildCanvasStream(newRaw);
+    const newVideoTrack = newCanvasStream.getVideoTracks()[0];
 
     // Reemplazar en localStream
     localStream.getVideoTracks().forEach((t) => localStream.removeTrack(t));
     localStream.addTrack(newVideoTrack);
 
-    // Actualizar elementos de video
+    // Actualizar preview con raw (mejor para visualización local)
     const previewEl   = document.getElementById('preview-video');
     const localCallEl = document.getElementById('join-local-video');
-    if (previewEl   && previewEl.srcObject)   previewEl.srcObject   = localStream;
-    if (localCallEl && localCallEl.srcObject) localCallEl.srcObject = localStream;
+    if (previewEl   && previewEl.srcObject)   previewEl.srcObject   = newRaw;
+    if (localCallEl && localCallEl.srcObject) localCallEl.srcObject = newRaw;
 
     // Reemplazar pista en PeerConnection (sin renegociar)
     if (pc) {
