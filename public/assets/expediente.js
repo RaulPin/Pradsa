@@ -102,11 +102,35 @@ const interviewId = params.get('id');
     const updatedAt = questionnaire.updated_at
       ? new Date(questionnaire.updated_at).toLocaleString('es-MX')
       : '';
-    document.getElementById('q-status-msg').innerHTML =
+    const qStatusMsg = document.getElementById('q-status-msg');
+    qStatusMsg.innerHTML =
       completed
         ? `<span style="color:var(--success)">✅ Completado</span> · ${updatedAt}`
         : `<span style="color:var(--warning)">⏳ En progreso</span> · Último guardado: ${updatedAt}`;
     document.getElementById('q-actions').hidden = false;
+
+    if (!completed) {
+      const btnMark = document.getElementById('btn-mark-complete');
+      btnMark.hidden = false;
+      btnMark.addEventListener('click', async () => {
+        btnMark.disabled = true;
+        btnMark.textContent = 'Guardando…';
+        try {
+          const responses = JSON.parse(questionnaire.responses || '{}');
+          await fetch(`/api/interviews/${interviewId}/questionnaire`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ responses, completed: true }),
+          });
+          qStatusMsg.innerHTML = `<span style="color:var(--success)">✅ Completado</span> · ${new Date().toLocaleString('es-MX')}`;
+          btnMark.hidden = true;
+        } catch {
+          alert('Error al marcar como completado. Intenta de nuevo.');
+          btnMark.disabled = false;
+          btnMark.textContent = '✅ Marcar como completado';
+        }
+      });
+    }
   }
 
   // ── Notas ────────────────────────────────────────────────────────────────────
