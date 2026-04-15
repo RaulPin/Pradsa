@@ -337,7 +337,16 @@ async function ensurePeerConnection() {
     }
   };
 
-  localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+  localStream.getTracks().forEach((t) => {
+    if (t.kind === 'video') {
+      pc.addTransceiver(t, {
+        streams: [localStream],
+        sendEncodings: [{ maxBitrate: 8_000_000, maxFramerate: 60 }],
+      });
+    } else {
+      pc.addTrack(t, localStream);
+    }
+  });
 }
 
 async function setHighVideoBitrate() {
