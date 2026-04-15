@@ -325,6 +325,7 @@ async function ensurePeerConnection() {
       setJoinConnStatus('connected');
       hideJoinStatus();
       startTimer();
+      setHighVideoBitrate();
     } else if (state === 'disconnected') {
       setJoinConnStatus('disconnected');
       showJoinStatus('Conexión inestable, intentando recuperar…');
@@ -337,6 +338,20 @@ async function ensurePeerConnection() {
   };
 
   localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+}
+
+async function setHighVideoBitrate() {
+  const sender = pc?.getSenders().find((s) => s.track?.kind === 'video');
+  if (!sender) return;
+  try {
+    const params = sender.getParameters();
+    if (!params.encodings?.length) params.encodings = [{}];
+    params.encodings[0].maxBitrate   = 8_000_000; // 8 Mbps
+    params.encodings[0].maxFramerate = 60;
+    await sender.setParameters(params);
+  } catch (e) {
+    console.warn('[BITRATE]', e.message);
+  }
 }
 
 function resetPc() {
