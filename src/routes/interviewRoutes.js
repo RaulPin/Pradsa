@@ -49,6 +49,7 @@ router.get('/stats',       ctrl.getStats);
 router.get('/kpi-summary', requireAdmin, ctrl.getKpiSummary);
 router.get('/:id', ctrl.getInterview);
 router.patch('/:id', ctrl.updateInterview);
+router.delete('/:id', requireAdmin, ctrl.deleteInterview);
 router.post('/:id/session/start', ctrl.startSession);
 router.post('/:id/photos', upload.single('photo'), ctrl.uploadPhoto);
 router.post('/:id/questionnaire', ctrl.saveQuestionnaire);

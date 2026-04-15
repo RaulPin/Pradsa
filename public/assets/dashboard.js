@@ -194,6 +194,9 @@ function renderInterviews() {
           </button>
           ${waCardButton(i)}` : ''}
         <a href="/expediente?id=${i.id}" class="btn btn-sm btn-ghost" title="Ver expediente completo">📁 Expediente</a>
+        ${currentUser?.role === 'admin' && (i.status === 'completed' || i.status === 'cancelled')
+          ? `<button class="btn btn-sm btn-ghost btn-delete-interview" data-id="${i.id}" data-title="${esc(i.title)}" style="color:#ef4444;border-color:#ef4444" title="Eliminar entrevista">🗑</button>`
+          : ''}
       </div>
     </div>
   `).join('');
@@ -208,6 +211,32 @@ function renderInterviews() {
         btn.textContent = '✓ Copiado';
         setTimeout(() => { btn.textContent = orig; }, 2000);
       });
+    });
+  });
+
+  // Eliminar entrevista (solo admin, solo completadas/canceladas)
+  list.querySelectorAll('.btn-delete-interview').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const title = btn.dataset.title;
+      if (!confirm(`¿Eliminar la entrevista "${title}"?\n\nSe borrarán permanentemente todos sus datos: fotos, sesión, cuestionario y grabación. Esta acción no se puede deshacer.`)) return;
+      btn.disabled = true;
+      try {
+        const resp = await fetch(`/api/interviews/${btn.dataset.id}`, { method: 'DELETE' });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          alert(err.error || 'Error al eliminar la entrevista.');
+          btn.disabled = false;
+          return;
+        }
+        btn.closest('.interview-card').remove();
+        if (!list.querySelector('.interview-card')) {
+          list.innerHTML = '<p class="muted" style="padding:.5rem 0">No hay entrevistas para mostrar.</p>';
+        }
+        if (currentUser?.role === 'admin') loadStats();
+      } catch {
+        alert('Error de red. Intenta de nuevo.');
+        btn.disabled = false;
+      }
     });
   });
 }

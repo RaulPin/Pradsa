@@ -1,6 +1,8 @@
 'use strict';
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db/database');
+const fs = require('fs');
+const path = require('path');
 const config = require('../config');
 const { sendInterviewInvite } = require('../utils/email');
 const audit = require('../utils/audit');
@@ -415,6 +417,54 @@ function saveRecording(req, res) {
   return res.json({ success: true, filename: req.file.filename });
 }
 
+// ─── Eliminar entrevista (solo completadas / canceladas, solo admin) ──────────
+function deleteInterview(req, res) {
+  const { id } = req.params;
+  const { userId } = req.user;
+
+  const interview = db.prepare('SELECT * FROM interviews WHERE id=?').get(id);
+  if (!interview) return res.status(404).json({ error: 'Entrevista no encontrada' });
+
+  if (interview.status !== 'completed' && interview.status !== 'cancelled') {
+    return res.status(400).json({ error: 'Solo se pueden eliminar entrevistas completadas o canceladas.' });
+  }
+
+  // Borrar archivos de fotos
+  const photoFiles = db.prepare('SELECT filename FROM photos WHERE interview_id=?').all(id);
+  for (const { filename } of photoFiles) {
+    const filePath = path.join(config.uploadDir, filename);
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch { /* ignorar */ }
+  }
+
+  // Borrar grabación de video si existe
+  const session = db.prepare('SELECT recording_filename FROM interview_sessions WHERE interview_id=? AND recording_filename IS NOT NULL LIMIT 1').get(id);
+  if (session?.recording_filename) {
+    const recPath = path.join(path.resolve(config.uploadDir), '..', 'recordings', id, session.recording_filename);
+    try { if (fs.existsSync(recPath)) fs.unlinkSync(recPath); } catch { /* ignorar */ }
+    // Borrar directorio si quedó vacío
+    try {
+      const recDir = path.join(path.resolve(config.uploadDir), '..', 'recordings', id);
+      if (fs.existsSync(recDir)) fs.rmdirSync(recDir);
+    } catch { /* ignorar */ }
+  }
+
+  // Borrar registros en orden de FK
+  db.transaction(() => {
+    db.prepare('DELETE FROM questionnaire_responses WHERE interview_id=?').run(id);
+    db.prepare('DELETE FROM photos WHERE interview_id=?').run(id);
+    db.prepare('DELETE FROM interview_sessions WHERE interview_id=?').run(id);
+    db.prepare('DELETE FROM interviews WHERE id=?').run(id);
+  })();
+
+  audit.log('INTERVIEW_DELETED', {
+    userId,
+    details: { interviewId: id, folio: interview.folio, title: interview.title, status: interview.status },
+    ip: req.ip,
+  });
+
+  return res.json({ success: true });
+}
+
 function getKpiSummary(req, res) {
   const totals = db.prepare(`
     SELECT
@@ -454,4 +504,5 @@ module.exports = {
   validateJoinToken, saveLocation, startSession,
   uploadPhoto, uploadPhotoPublic,
   saveQuestionnaire, getStats, getKpiSummary, saveRecording,
+  deleteInterview,
 };
