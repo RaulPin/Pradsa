@@ -265,7 +265,7 @@ async function handleSignal(msg) {
       if (msg.initiator) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        wsSend({ type: 'offer', sdp: offer.sdp });
+        wsSend({ type: 'offer', sdp: boostVideoSdp(offer.sdp) });
       }
       break;
 
@@ -274,7 +274,7 @@ async function handleSignal(msg) {
       await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      wsSend({ type: 'answer', sdp: answer.sdp });
+      wsSend({ type: 'answer', sdp: boostVideoSdp(answer.sdp) });
       break;
 
     case 'answer':
@@ -337,16 +337,27 @@ async function ensurePeerConnection() {
     }
   };
 
-  localStream.getTracks().forEach((t) => {
-    if (t.kind === 'video') {
-      pc.addTransceiver(t, {
-        streams: [localStream],
-        sendEncodings: [{ maxBitrate: 8_000_000, maxFramerate: 60 }],
-      });
-    } else {
-      pc.addTrack(t, localStream);
+  localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+}
+
+function boostVideoSdp(sdp) {
+  // Aumenta el ancho de banda de video a 20 Mbps en el SDP
+  const lines = sdp.split('\r\n');
+  const out = [];
+  let inVideo = false;
+  let bAdded = false;
+  for (const line of lines) {
+    if (line.startsWith('m=video')) { inVideo = true; bAdded = false; }
+    else if (line.startsWith('m=')) { inVideo = false; }
+    if (inVideo && line.startsWith('b=AS:')) {
+      out.push('b=AS:20000'); bAdded = true; continue;
     }
-  });
+    out.push(line);
+    if (inVideo && !bAdded && line.startsWith('c=')) {
+      out.push('b=AS:20000'); bAdded = true;
+    }
+  }
+  return out.join('\r\n');
 }
 
 async function setHighVideoBitrate() {
