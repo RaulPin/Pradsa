@@ -61,6 +61,7 @@ let searchTimer  = null;
     initNewInterviewForm();
     initUserManagement();
     initAudit();
+    if (me.role === 'admin') checkPurgeAlert();
 
     // Logout
     document.getElementById('btn-logout').addEventListener('click', async () => {
@@ -465,6 +466,13 @@ async function api(url) {
   return res.json();
 }
 
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) { window.location.replace('/login'); return null; }
+  if (!res.ok) { throw new Error(`API error ${res.status}`); }
+  return res.json();
+}
+
 function setAlert(el, msg) {
   if (!el) return;
   if (!msg) { el.hidden = true; el.textContent = ''; return; }
@@ -575,6 +583,16 @@ document.getElementById('btn-download-kpi')?.addEventListener('click', () => {
 });
 
 // ─── Purga de registros antiguos ─────────────────────────────────────────────
+async function checkPurgeAlert() {
+  try {
+    const data = await apiFetch('/report/kpi/purge-summary');
+    if (data && data.interviews > 0) {
+      const banner = document.getElementById('purge-alert-banner');
+      if (banner) banner.hidden = false;
+    }
+  } catch { /* silencioso */ }
+}
+
 (function initPurge() {
   const modal   = document.getElementById('purge-modal');
   const summary = document.getElementById('purge-summary');
@@ -584,6 +602,10 @@ document.getElementById('btn-download-kpi')?.addEventListener('click', () => {
     modal.style.display = 'flex';
     try {
       const data = await apiFetch('/report/kpi/purge-summary');
+      if (data.interviews === 0) {
+        summary.innerHTML = '<em>No hay registros con más de 3 meses de antigüedad.</em>';
+        return;
+      }
       const cutDate = new Date(data.cutoff).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' });
       summary.innerHTML = `
         <strong>Registros anteriores al ${cutDate}:</strong><br>
@@ -606,10 +628,35 @@ document.getElementById('btn-download-kpi')?.addEventListener('click', () => {
     btn.disabled = true;
     btn.textContent = 'Eliminando…';
     try {
-      const result = await apiFetch('/report/kpi/purge', { method: 'DELETE' });
-      modal.style.display = 'none';
-      alert(`✅ Purga completada:\n• Entrevistas: ${result.interviews}\n• Fotos: ${result.photos}\n• Archivos eliminados: ${result.filesDeleted}\n• Sesiones: ${result.sessions}\n• Cuestionarios: ${result.questionnaires}`);
-      loadKpiSummary();
+      const resp = await fetch('/report/kpi/purge', { method: 'DELETE' });
+      if (resp.status === 401) { window.location.replace('/login'); return; }
+      if (!resp.ok) throw new Error(`Error ${resp.status}`);
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('spreadsheet') || contentType.includes('octet-stream')) {
+        // La purga tuvo éxito → descargar informe Excel
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        const cd = resp.headers.get('content-disposition') || '';
+        const match = cd.match(/filename="([^"]+)"/);
+        a.download = match ? match[1] : `Purga_Pradsa_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        modal.style.display = 'none';
+        // Ocultar banner de alerta
+        const banner = document.getElementById('purge-alert-banner');
+        if (banner) banner.hidden = true;
+        loadKpiSummary();
+      } else {
+        // JSON → sin registros para purgar
+        const data = await resp.json();
+        modal.style.display = 'none';
+        alert(data.message || 'Sin registros para purgar.');
+      }
     } catch {
       alert('Error al purgar registros. Intenta de nuevo.');
     } finally {

@@ -93,6 +93,12 @@
     <!-- Banner expiración de contraseña -->
     <div id="pw-expiry-banner" class="pw-expiry-banner" hidden></div>
 
+    <!-- Banner alerta de purga pendiente (solo admin) -->
+    <div id="purge-alert-banner" hidden style="background:#fef3c7;border-bottom:2px solid #f59e0b;padding:.6rem 1.5rem;font-size:.875rem;color:#78350f;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+      <span style="flex:1">⚠️ <strong>Purga requerida:</strong> Existen registros con más de 3 meses de antigüedad que deben eliminarse según la política de retención de datos.</span>
+      <button onclick="document.querySelector('.nav-item[data-tab=kpi]').click()" style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:.3rem .9rem;cursor:pointer;font-weight:600;font-size:.82rem;white-space:nowrap;flex-shrink:0;">Ver KPI y purgar →</button>
+    </div>
+
     <!-- Top bar -->
     <header class="topbar">
       <h1 class="topbar-title" id="topbar-title">Entrevistas</h1>

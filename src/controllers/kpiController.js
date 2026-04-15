@@ -53,6 +53,31 @@ module.exports.getPurgeSummary = function getPurgeSummary(req, res) {
 module.exports.purgeOldRecords = function purgeOldRecords(req, res) {
   const cutoff = getCutoffDate(3);
   const d = getDb();
+  const now = new Date();
+
+  // Capturar detalle de entrevistas a eliminar antes de borrar
+  const toDelete = d.prepare(`
+    SELECT
+      i.id, i.title, i.type, i.status,
+      i.scheduled_at, i.created_at,
+      i.interviewee_name, i.interviewee_email,
+      i.interviewee_phone, i.interviewee_address,
+      u.name AS entrevistador,
+      (SELECT COUNT(*) FROM photos p WHERE p.interview_id = i.id) AS fotos,
+      ROUND(COALESCE(s.duration_seconds, 0) / 60.0, 1) AS duracion_min
+    FROM interviews i
+    LEFT JOIN users u ON u.id = i.scheduled_by
+    LEFT JOIN (
+      SELECT interview_id, duration_seconds FROM interview_sessions
+      WHERE ended_at IS NOT NULL GROUP BY interview_id
+    ) s ON s.interview_id = i.id
+    WHERE i.created_at < ?
+    ORDER BY i.scheduled_at DESC
+  `).all(cutoff);
+
+  if (toDelete.length === 0) {
+    return res.json({ success: true, message: 'No hay registros para purgar.', interviews: 0 });
+  }
 
   // Obtener filenames de fotos a borrar
   const photoFiles = d.prepare(`
@@ -97,7 +122,59 @@ module.exports.purgeOldRecords = function purgeOldRecords(req, res) {
   const result = purge();
   console.log(`[PURGE] Registros eliminados (antigüedad > 3 meses):`, result, `| Archivos: ${filesDeleted}`);
 
-  res.json({ success: true, cutoff, filesDeleted, ...result });
+  /* ── Generar informe Excel ─────────────────────────────────────────────── */
+  const STATUS_ES = { completed: 'Completada', cancelled: 'Cancelada', scheduled: 'Programada', in_progress: 'En curso' };
+  const TYPE_ES   = { pyme: 'Pyme', fiduciario: 'Fiduciario' };
+  const label     = now.toISOString().slice(0, 10);
+  const cutLabel  = new Date(cutoff).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const sheetResumen = [
+    ['INFORME DE PURGA DE DATOS', ''],
+    ['Fecha de purga',                           now.toLocaleString('es-MX')],
+    ['Registros anteriores a',                   cutLabel],
+    [],
+    ['Categoría',                    'Registros eliminados'],
+    ['Entrevistas',                  result.interviews],
+    ['Fotos (registros BD)',         result.photos],
+    ['Archivos de foto eliminados',  filesDeleted],
+    ['Sesiones',                     result.sessions],
+    ['Cuestionarios',                result.questionnaires],
+  ];
+
+  const sheetDetalle = [
+    ['Folio','Título','Tipo','Estado','Fecha programada','Fecha creación','Entrevistado','Correo','Teléfono','Dirección','Entrevistador','Duración (min)','Fotos'],
+    ...toDelete.map(r => [
+      r.id.slice(0, 8).toUpperCase(),
+      r.title,
+      TYPE_ES[r.type]    || r.type,
+      STATUS_ES[r.status] || r.status,
+      r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('es-MX') : '',
+      r.created_at   ? new Date(r.created_at).toLocaleString('es-MX')   : '',
+      r.interviewee_name    || '',
+      r.interviewee_email   || '',
+      r.interviewee_phone   || '',
+      r.interviewee_address || '',
+      r.entrevistador       || '',
+      r.duracion_min        || 0,
+      r.fotos               || 0,
+    ]),
+  ];
+
+  const wb = XLSX.utils.book_new();
+
+  const wsResumen = XLSX.utils.aoa_to_sheet(sheetResumen);
+  wsResumen['!cols'] = [{ wch: 36 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen Purga');
+
+  const wsDetalle = XLSX.utils.aoa_to_sheet(sheetDetalle);
+  wsDetalle['!cols'] = [8,30,12,14,20,20,25,28,15,35,20,14,8].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, wsDetalle, 'Registros Eliminados');
+
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  res.setHeader('Content-Disposition', `attachment; filename="Purga_Pradsa_${label}.xlsx"`);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
 };
 
 module.exports.downloadKpiExcel = function downloadKpiExcel(req, res) {
