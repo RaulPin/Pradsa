@@ -21,14 +21,14 @@ async function sendWelcomeEmail(to, name, tempPassword) {
   await t.sendMail({
     from: config.smtp.from,
     to,
-    subject: 'Bienvenido a EntrevistasPradsa – Credenciales de acceso',
+    subject: 'Bienvenido a FieldCheck – Credenciales de acceso',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;padding:32px;border-radius:12px;">
         <div style="background:#1e3a5f;padding:20px 24px;border-radius:8px;margin-bottom:24px;">
-          <h1 style="margin:0;color:#ffffff;font-size:22px;">EntrevistasPradsa</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;">FieldCheck</h1>
         </div>
         <p style="color:#1e293b;">Hola <strong>${name}</strong>,</p>
-        <p style="color:#1e293b;">Tu cuenta ha sido creada en la plataforma EntrevistasPradsa.</p>
+        <p style="color:#1e293b;">Tu cuenta ha sido creada en la plataforma FieldCheck.</p>
         <div style="background:#ffffff;border:1px solid #e2e8f0;padding:16px;border-radius:8px;margin:20px 0;">
           <p style="margin:0;color:#475569;"><strong>Usuario:</strong> ${to}</p>
           <p style="margin:10px 0 0;color:#475569;"><strong>Contraseña temporal:</strong></p>
@@ -64,10 +64,10 @@ async function sendInterviewInvite(to, intervieweeName, interviewTitle, schedule
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;padding:32px;border-radius:12px;">
         <div style="background:#1e3a5f;padding:20px 24px;border-radius:8px;margin-bottom:24px;">
-          <h1 style="margin:0;color:#ffffff;font-size:22px;">EntrevistasPradsa</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;">FieldCheck</h1>
         </div>
         <p style="color:#1e293b;">Hola <strong>${intervieweeName}</strong>,</p>
-        <p style="color:#1e293b;">Has sido invitado/a a una entrevista de crédito a través de la plataforma EntrevistasPradsa.</p>
+        <p style="color:#1e293b;">Has sido invitado/a a una entrevista de crédito a través de la plataforma FieldCheck.</p>
         <div style="background:#ffffff;border:1px solid #e2e8f0;padding:16px;border-radius:8px;margin:20px 0;">
           <p style="margin:0;color:#475569;"><strong>Entrevista:</strong> ${interviewTitle}</p>
           <p style="margin:10px 0 0;color:#475569;"><strong>Fecha y hora programada:</strong><br>${dateStr}</p>
@@ -80,7 +80,7 @@ async function sendInterviewInvite(to, intervieweeName, interviewTitle, schedule
         </div>
         <p style="font-size:13px;color:#64748b;">Este enlace es personal e intransferible. No lo compartas con nadie.</p>
         <hr style="margin:32px 0;border:none;border-top:1px solid #e2e8f0;">
-        <p style="font-size:12px;color:#94a3b8;">Este mensaje fue generado automáticamente por EntrevistasPradsa.</p>
+        <p style="font-size:12px;color:#94a3b8;">Este mensaje fue generado automáticamente por FieldCheck.</p>
       </div>
     `,
   });
@@ -91,11 +91,11 @@ async function sendOTPEmail(to, name, code) {
   await t.sendMail({
     from: config.smtp.from,
     to,
-    subject: 'Código de verificación – EntrevistasPradsa',
+    subject: 'Código de verificación – FieldCheck',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;padding:32px;border-radius:12px;">
         <div style="background:#1e3a5f;padding:20px 24px;border-radius:8px;margin-bottom:24px;">
-          <h1 style="margin:0;color:#ffffff;font-size:22px;">EntrevistasPradsa</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;">FieldCheck</h1>
         </div>
         <p style="color:#1e293b;">Hola <strong>${name}</strong>,</p>
         <p style="color:#1e293b;">Se ha solicitado un acceso a tu cuenta. Usa el siguiente código de verificación:</p>
@@ -110,7 +110,7 @@ async function sendOTPEmail(to, name, code) {
             Si no fuiste tú quien intentó ingresar, comunícalo de inmediato al administrador del sistema.
           </p>
         </div>
-        <p style="font-size:13px;color:#64748b;">Por seguridad, nunca compartas este código con nadie. EntrevistasPradsa jamás te lo solicitará.</p>
+        <p style="font-size:13px;color:#64748b;">Por seguridad, nunca compartas este código con nadie. FieldCheck jamás te lo solicitará.</p>
         <hr style="margin:32px 0;border:none;border-top:1px solid #e2e8f0;">
         <p style="font-size:12px;color:#94a3b8;">Este mensaje fue generado automáticamente. ISO 27001:2022.</p>
       </div>

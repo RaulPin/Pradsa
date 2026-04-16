@@ -575,7 +575,7 @@ function buildWaMessage(name, title, scheduledAt, url) {
         year: 'numeric', hour: '2-digit', minute: '2-digit',
       })
     : '';
-  return `Hola *${name}*, has sido invitado/a a una entrevista de crédito con EntrevistasPradsa.\n\n`
+  return `Hola *${name}*, has sido invitado/a a una entrevista de crédito con FieldCheck.\n\n`
     + `📋 *${title}*\n`
     + (dateStr ? `📅 ${dateStr}\n\n` : '\n')
     + `🔗 Enlace de acceso:\n${url}\n\n`
@@ -670,7 +670,7 @@ async function checkPurgeAlert() {
         a.href = blobUrl;
         const cd = resp.headers.get('content-disposition') || '';
         const match = cd.match(/filename="([^"]+)"/);
-        a.download = match ? match[1] : `Purga_Pradsa_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        a.download = match ? match[1] : `Purga_FieldCheck_${new Date().toISOString().slice(0, 10)}.xlsx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

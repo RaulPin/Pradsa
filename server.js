@@ -124,7 +124,7 @@ setupSignaling(server);
 
 server.listen(config.port, () => {
   console.log('\n' + '='.repeat(55));
-  console.log('  EntrevistasPradsa');
+  console.log('  FieldCheck');
   console.log(`  http://localhost:${config.port}`);
   console.log(`  Ambiente: ${config.nodeEnv}`);
   console.log(`  URL pública: ${config.appUrl}`);

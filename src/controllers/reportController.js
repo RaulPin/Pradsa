@@ -159,7 +159,7 @@ function generateFiduciarioReport(req, res) {
 <div class="page">
 
   <div class="report-header">
-    <div class="report-brand">EntrevistasPradsa</div>
+    <div class="report-brand">FieldCheck</div>
     <div class="report-title">Reporte de Visita Ocular</div>
   </div>
 
@@ -366,7 +366,7 @@ function generateFiduciarioReport(req, res) {
 
   <div class="footer-line">
     <span>En la ciudad de ${val(r,'ciudad')} &nbsp; .a ${val(r,'fecha_dia')} de ${val(r,'fecha_mes')} de ${val(r,'fecha_anio','2')}</span>
-    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''}</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''}</span>
   </div>
 
 </div><!-- /page 2 -->
@@ -530,7 +530,7 @@ function generatePymeReport(req, res) {
   <!-- Header -->
   <div class="rh">
     <div class="rh-brand">
-      <div style="font-size:16pt;font-weight:900;color:#1e3a5f;">EntrevistasPradsa</div>
+      <div style="font-size:16pt;font-weight:900;color:#1e3a5f;">FieldCheck</div>
       <div class="brand-sub">Informe Confidencial</div>
     </div>
     <div class="rh-title">REPORTE DE VISITA OCULAR</div>
@@ -712,7 +712,7 @@ function generatePymeReport(req, res) {
 
   <div class="footer-line">
     <span>${val(r,'razon_social')} · Pyme</span>
-    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''} · 1/3</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 1/3</span>
   </div>
 </div><!-- /page 1 -->
 
@@ -738,7 +738,7 @@ function generatePymeReport(req, res) {
 
   <div class="footer-line">
     <span>${val(r,'razon_social')} · Pyme</span>
-    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''} · 2/3</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 2/3</span>
   </div>
 </div><!-- /page 2 -->
 
@@ -797,7 +797,7 @@ function generatePymeReport(req, res) {
 
   <div class="footer-line" style="margin-top:6mm;">
     <span>${val(r,'razon_social')} · Pyme</span>
-    <span>Generado por EntrevistasPradsa · ${interviewer?.name || ''} · 3/3</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 3/3</span>
   </div>
 </div><!-- /page 3 -->
 

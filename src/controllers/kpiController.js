@@ -172,7 +172,7 @@ module.exports.purgeOldRecords = function purgeOldRecords(req, res) {
 
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-  res.setHeader('Content-Disposition', `attachment; filename="Purga_Pradsa_${label}.xlsx"`);
+  res.setHeader('Content-Disposition', `attachment; filename="Purga_FieldCheck_${label}.xlsx"`);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
 };
@@ -385,7 +385,7 @@ module.exports.downloadKpiExcel = function downloadKpiExcel(req, res) {
 
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-  res.setHeader('Content-Disposition', `attachment; filename="KPI_EntrevistasPradsa_${label}.xlsx"`);
+  res.setHeader('Content-Disposition', `attachment; filename="KPI_FieldCheck_${label}.xlsx"`);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
 };

@@ -1,5 +1,5 @@
 {
-  "name": "entrevistaspradsa",
+  "name": "fieldcheck",
   "version": "1.0.0",
   "description": "Plataforma de videollamadas y entrevistas para créditos Pyme y Fiduciario – ISO 27001:2022",
   "main": "server.js",

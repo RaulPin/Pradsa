@@ -140,7 +140,7 @@ async function generateFiduciarioWord(req, res) {
       children: [
         // Título
         new Paragraph({
-          children: [new TextRun({ text: 'EntrevistasPradsa', bold: true, size: 36, color: BLUE_DARK })],
+          children: [new TextRun({ text: 'FieldCheck', bold: true, size: 36, color: BLUE_DARK })],
           alignment: AlignmentType.CENTER,
         }),
         new Paragraph({
@@ -296,7 +296,7 @@ async function generateFiduciarioWord(req, res) {
 
         new Paragraph({
           children: [new TextRun({
-            text: `Generado por EntrevistasPradsa · ${interviewer?.name || ''} · ${new Date().toLocaleDateString('es-MX')}`,
+            text: `Generado por FieldCheck · ${interviewer?.name || ''} · ${new Date().toLocaleDateString('es-MX')}`,
             size: 16, color: '888888', italics: true,
           })],
           alignment: AlignmentType.RIGHT,
@@ -353,7 +353,7 @@ async function generatePymeWord(req, res) {
       properties: {},
       children: [
         new Paragraph({
-          children: [new TextRun({ text: 'EntrevistasPradsa', bold: true, size: 36, color: BLUE_DARK })],
+          children: [new TextRun({ text: 'FieldCheck', bold: true, size: 36, color: BLUE_DARK })],
           alignment: AlignmentType.CENTER,
         }),
         new Paragraph({
@@ -557,7 +557,7 @@ async function generatePymeWord(req, res) {
 
         new Paragraph({
           children: [new TextRun({
-            text: `Generado por EntrevistasPradsa · ${interviewer?.name || ''} · ${new Date().toLocaleDateString('es-MX')}`,
+            text: `Generado por FieldCheck · ${interviewer?.name || ''} · ${new Date().toLocaleDateString('es-MX')}`,
             size: 16, color: '888888', italics: true,
           })],
           alignment: AlignmentType.RIGHT,
