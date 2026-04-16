@@ -60,7 +60,8 @@ function handleMessage(ws, msg, req) {
     case 'join':       return handleJoin(ws, msg, req);
     case 'offer':
     case 'answer':
-    case 'ice':        return relay(ws, msg);
+    case 'ice':
+    case 'location_update': return relay(ws, msg);
     case 'leave':      return leaveRoom(ws, true);
     case 'end_call':   return handleEndCall(ws, msg);
     default: break;

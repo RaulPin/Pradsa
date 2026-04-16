@@ -88,9 +88,9 @@ const canvas       = document.getElementById('capture-canvas');
     (data.photos || []).forEach((p) => addPhotoThumb(p.filename));
     photoCount.textContent = data.photos?.length || 0;
 
-    // Mostrar ubicación si existe
-    if (data.session?.interviewee_location_lat) {
-      updateLocationUI(data.session);
+    // Mostrar ubicación si ya fue capturada
+    if (data.interviewee_location_lat) {
+      updateLocationUI(data.interviewee_location_lat, data.interviewee_location_lng, data.interviewee_location_address);
     }
   } catch (err) {
     showStatus('No se pudo cargar la entrevista. Verifica que tengas acceso.', true);
@@ -199,6 +199,10 @@ async function handleSignal(msg) {
       remotePlaceholder.hidden = false;
       remoteVideo.srcObject = null;
       remoteLabel.textContent = 'Entrevistado';
+      break;
+
+    case 'location_update':
+      updateLocationUI(msg.lat, msg.lng, msg.address);
       break;
 
     case 'call_ended':
@@ -505,14 +509,19 @@ async function endCall(notify) {
 }
 
 // ─── Ubicación ────────────────────────────────────────────────────────────────
-function updateLocationUI(session) {
-  if (!session?.interviewee_location_lat) return;
+function updateLocationUI(lat, lng, address) {
+  if (!lat || !lng) return;
+  const latF = Number(lat).toFixed(5);
+  const lngF = Number(lng).toFixed(5);
+  const mapsUrl = `https://www.google.com/maps?q=${latF},${lngF}`;
   locationEl.innerHTML = `
-    <p>📍 ${session.interviewee_location_address || `${session.interviewee_location_lat}, ${session.interviewee_location_lng}`}</p>
-    <p style="font-size:.78rem;color:var(--muted);">
-      Lat: ${session.interviewee_location_lat.toFixed(5)} &nbsp;
-      Lng: ${session.interviewee_location_lng.toFixed(5)}
+    <p style="margin:0 0 .4rem;font-size:.85rem;color:var(--muted);">
+      ${address || `${latF}, ${lngF}`}
     </p>
+    <a href="${mapsUrl}" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .8rem;background:#1a73e8;color:#fff;border-radius:6px;font-size:.82rem;text-decoration:none;font-weight:600;">
+      📍 Ver en Google Maps
+    </a>
   `;
 }
 

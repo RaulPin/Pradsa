@@ -273,6 +273,8 @@ async function sendLocation() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ latitude, longitude, address }),
   }).catch(() => {});
+  // Notificar al entrevistador en tiempo real vía WebSocket
+  wsSend({ type: 'location_update', lat: latitude, lng: longitude, address });
 }
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
