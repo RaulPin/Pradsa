@@ -154,6 +154,14 @@ async function requestPermissions() {
         },
         audio: true,
       });
+
+      // Re-enumerar cámaras DESPUÉS de obtener el permiso (corrección iOS Safari:
+      // antes del permiso solo devuelve 1 dispositivo aunque haya más)
+      try {
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        hasMultipleCameras = devs.filter((d) => d.kind === 'videoinput').length > 1;
+      } catch { /* mantener valor anterior */ }
+
       localStream = await buildCanvasStream(_rawCamStream);
       permCamera = true;
       permMic    = true;
@@ -196,9 +204,12 @@ async function requestPermissions() {
       document.getElementById('location-mismatch').hidden = false;
     }
 
-    // Mostrar botón voltear en sala de espera
+    // Mostrar botón voltear en sala de espera (post-permiso, ya con conteo correcto)
     const flipWaiting = document.getElementById('btn-flip-waiting');
-    if (flipWaiting && hasMultipleCameras) flipWaiting.hidden = false;
+    if (flipWaiting) flipWaiting.hidden = !hasMultipleCameras;
+    // Actualizar también el botón en la sala de llamada (por si ya era visible)
+    const btnFlipCall = document.getElementById('join-btn-flip');
+    if (btnFlipCall) btnFlipCall.style.display = hasMultipleCameras ? '' : 'none';
 
     show('waiting');
     connectSignaling();
@@ -455,6 +466,35 @@ function resetPc() {
 
   // Voltear cámara (sala de espera)
   document.getElementById('btn-flip-waiting')?.addEventListener('click', flipCamera);
+
+  // Verificar ubicación GPS durante la llamada
+  document.getElementById('join-btn-geo')?.addEventListener('click', async () => {
+    const btn  = document.getElementById('join-btn-geo');
+    const icon = btn.querySelector('.ctrl-icon');
+    const lbl  = btn.querySelector('.ctrl-label');
+    btn.disabled = true;
+    icon.textContent = '⏳';
+    lbl.textContent  = 'Capturando…';
+    try {
+      geoCoords = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 15000, maximumAge: 0,
+        })
+      );
+      await sendLocation();
+      icon.textContent = '✅';
+      lbl.textContent  = 'Verificado';
+    } catch {
+      icon.textContent = '❌';
+      lbl.textContent  = 'Sin GPS';
+    } finally {
+      setTimeout(() => {
+        icon.textContent = '📍';
+        lbl.textContent  = 'Ubicación';
+        btn.disabled = false;
+      }, 3000);
+    }
+  });
 
   // Finalizar
   document.getElementById('join-btn-end')?.addEventListener('click', () => {

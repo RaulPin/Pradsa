@@ -233,27 +233,13 @@ function saveLocation(req, res) {
   if (!interview) return res.status(404).json({ error: 'Enlace inválido' });
   if (interview.status === 'cancelled') return res.status(400).json({ error: 'Entrevista cancelada' });
 
-  const session = db
-    .prepare('SELECT id FROM interview_sessions WHERE interview_id=? ORDER BY created_at DESC LIMIT 1')
-    .get(interview.id);
-
-  const now = new Date().toISOString();
-
-  if (session) {
-    db.prepare(`
-      UPDATE interview_sessions
-      SET interviewee_location_lat=?, interviewee_location_lng=?,
-          interviewee_location_address=?, interviewee_ip=?
-      WHERE id=?
-    `).run(latitude, longitude, address || null, req.ip, session.id);
-  } else {
-    db.prepare(`
-      INSERT INTO interview_sessions
-        (id, interview_id, interviewee_location_lat, interviewee_location_lng,
-         interviewee_location_address, interviewee_ip, created_at)
-      VALUES (?,?,?,?,?,?,?)
-    `).run(uuidv4(), interview.id, latitude, longitude, address || null, req.ip, now);
-  }
+  // Guardar en la entrevista directamente (independiente del estado de la sesión)
+  db.prepare(`
+    UPDATE interviews
+    SET interviewee_location_lat=?, interviewee_location_lng=?,
+        interviewee_location_address=?, interviewee_ip=?
+    WHERE id=?
+  `).run(latitude, longitude, address || null, req.ip, interview.id);
 
   audit.log('LOCATION_CAPTURED', {
     details: { interviewId: interview.id, lat: latitude, lng: longitude },

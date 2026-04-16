@@ -130,6 +130,12 @@ try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_interviews_folio ON intervi
 // Agregar columna recording_filename a interview_sessions
 try { db.exec('ALTER TABLE interview_sessions ADD COLUMN recording_filename TEXT'); } catch { /* ya existe */ }
 
+// Geolocalización e IP directamente en la entrevista (independiente de la sesión)
+try { db.exec('ALTER TABLE interviews ADD COLUMN interviewee_location_lat REAL'); } catch { /* ya existe */ }
+try { db.exec('ALTER TABLE interviews ADD COLUMN interviewee_location_lng REAL'); } catch { /* ya existe */ }
+try { db.exec('ALTER TABLE interviews ADD COLUMN interviewee_location_address TEXT'); } catch { /* ya existe */ }
+try { db.exec('ALTER TABLE interviews ADD COLUMN interviewee_ip TEXT'); } catch { /* ya existe */ }
+
 // Política de expiración de contraseñas (120 días)
 try { db.exec('ALTER TABLE users ADD COLUMN password_expires_at TEXT'); } catch { /* ya existe */ }
 

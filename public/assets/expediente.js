@@ -44,9 +44,11 @@ const interviewId = params.get('id');
     setEl('exp-duration', '—');
   }
 
-  if (session.interviewee_location_lat) {
-    const lat = session.interviewee_location_lat.toFixed(5);
-    const lng = session.interviewee_location_lng.toFixed(5);
+  const geoLat = data.interviewee_location_lat ?? session.interviewee_location_lat;
+  const geoLng = data.interviewee_location_lng ?? session.interviewee_location_lng;
+  if (geoLat) {
+    const lat = Number(geoLat).toFixed(5);
+    const lng = Number(geoLng).toFixed(5);
     const url = `https://maps.google.com/?q=${lat},${lng}`;
     document.getElementById('exp-geo').innerHTML =
       `<a href="${url}" target="_blank" rel="noopener">${lat}, ${lng} 🗺</a>`;
