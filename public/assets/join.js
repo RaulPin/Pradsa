@@ -469,35 +469,6 @@ function resetPc() {
   // Voltear cámara (sala de espera)
   document.getElementById('btn-flip-waiting')?.addEventListener('click', flipCamera);
 
-  // Verificar ubicación GPS durante la llamada
-  document.getElementById('join-btn-geo')?.addEventListener('click', async () => {
-    const btn  = document.getElementById('join-btn-geo');
-    const icon = btn.querySelector('.ctrl-icon');
-    const lbl  = btn.querySelector('.ctrl-label');
-    btn.disabled = true;
-    icon.textContent = '⏳';
-    lbl.textContent  = 'Capturando…';
-    try {
-      geoCoords = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true, timeout: 15000, maximumAge: 0,
-        })
-      );
-      await sendLocation();
-      icon.textContent = '✅';
-      lbl.textContent  = 'Verificado';
-    } catch {
-      icon.textContent = '❌';
-      lbl.textContent  = 'Sin GPS';
-    } finally {
-      setTimeout(() => {
-        icon.textContent = '📍';
-        lbl.textContent  = 'Ubicación';
-        btn.disabled = false;
-      }, 3000);
-    }
-  });
-
   // Finalizar
   document.getElementById('join-btn-end')?.addEventListener('click', () => {
     if (confirm('¿Deseas finalizar la entrevista?')) {
