@@ -589,6 +589,40 @@ select option { background: var(--bg-card); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─── Responsive ────────────────────────────────────────────── */
+
+/* 14" laptop: FHD con escalado 125% (~1536px) o resolución 1366×768 */
+@media (max-width: 1440px) {
+  .call-body          { grid-template-columns: 1fr 260px; }
+  .call-header        { padding: .45rem 1rem; }
+  .call-sidebar       { padding: .5rem; gap: .5rem; }
+  .sidebar-section    { padding: .6rem .75rem; gap: .35rem; }
+  .sidebar-section h3 { font-size: .82rem; }
+  .notes-area         { min-height: 60px; }
+  .call-controls      { padding: .6rem .75rem; gap: .6rem; }
+  .ctrl-btn           { min-width: 72px; padding: .5rem .8rem; }
+  .ctrl-icon          { font-size: 1.2rem; }
+  .video-cell.local-cell { width: 160px; height: 112px; }
+}
+
+/* 14" comprimido / FHD con escalado 150% (~1280px) */
+@media (max-width: 1280px) {
+  .call-body          { grid-template-columns: 1fr 230px; }
+  .sidebar-section    { padding: .5rem .65rem; }
+  .notes-area         { min-height: 48px; }
+  .ctrl-btn           { min-width: 64px; padding: .45rem .65rem; }
+  .video-cell.local-cell { width: 140px; height: 98px; }
+}
+
+/* Altura reducida (pantallas 768px de alto) */
+@media (max-height: 800px) {
+  .call-header     { padding: .4rem 1rem; }
+  .call-controls   { padding: .5rem .75rem; }
+  .sidebar-section { padding: .5rem .65rem; gap: .3rem; }
+  .notes-area      { min-height: 40px; }
+  .ctrl-icon       { font-size: 1.1rem; }
+  .ctrl-label      { font-size: .68rem; }
+}
+
 @media (max-width: 900px) {
   .call-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .call-sidebar {
