@@ -435,12 +435,17 @@ function deleteInterview(req, res) {
   }
 
   // Borrar registros en orden de FK
-  db.transaction(() => {
+  db.exec('BEGIN');
+  try {
     db.prepare('DELETE FROM questionnaire_responses WHERE interview_id=?').run(id);
     db.prepare('DELETE FROM photos WHERE interview_id=?').run(id);
     db.prepare('DELETE FROM interview_sessions WHERE interview_id=?').run(id);
     db.prepare('DELETE FROM interviews WHERE id=?').run(id);
-  })();
+    db.exec('COMMIT');
+  } catch (txErr) {
+    try { db.exec('ROLLBACK'); } catch { /* ignore */ }
+    throw txErr;
+  }
 
   audit.log('INTERVIEW_DELETED', {
     userId,

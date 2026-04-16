@@ -96,7 +96,9 @@ module.exports.purgeOldRecords = function purgeOldRecords(req, res) {
   }
 
   // Borrar registros en orden (respetando FK sin CASCADE)
-  const purge = d.transaction(() => {
+  let result;
+  d.exec('BEGIN');
+  try {
     const q = d.prepare(`
       DELETE FROM questionnaire_responses WHERE interview_id IN
       (SELECT id FROM interviews WHERE created_at < ?)
@@ -116,10 +118,12 @@ module.exports.purgeOldRecords = function purgeOldRecords(req, res) {
       `DELETE FROM interviews WHERE created_at < ?`
     ).run(cutoff);
 
-    return { interviews: i.changes, photos: p.changes, sessions: s.changes, questionnaires: q.changes };
-  });
-
-  const result = purge();
+    d.exec('COMMIT');
+    result = { interviews: i.changes, photos: p.changes, sessions: s.changes, questionnaires: q.changes };
+  } catch (txErr) {
+    try { d.exec('ROLLBACK'); } catch { /* ignore */ }
+    throw txErr;
+  }
   console.log(`[PURGE] Registros eliminados (antigüedad > 3 meses):`, result, `| Archivos: ${filesDeleted}`);
 
   /* ── Generar informe Excel ─────────────────────────────────────────────── */
