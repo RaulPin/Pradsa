@@ -314,6 +314,12 @@ async function handleSignal(msg) {
         document.getElementById('join-btn-flip').style.display = '';
       }
       setJoinConnStatus('connecting');
+      // Re-enviar ubicación ahora que el entrevistador está en sala y el WS está activo
+      if (geoCoords) {
+        const { latitude, longitude } = geoCoords.coords;
+        wsSend({ type: 'location_update', lat: latitude, lng: longitude,
+          address: `Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}` });
+      }
       await ensurePeerConnection();
       if (msg.initiator) {
         const offer = await pc.createOffer();
