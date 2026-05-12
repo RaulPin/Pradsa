@@ -28,9 +28,7 @@ let wsReconnectAttempt = 0;
 let wsReconnecting     = false;
 let facingMode         = 'user';      // 'user' (frontal) | 'environment' (trasera)
 let hasMultipleCameras = false;
-let _rawCamStream      = null;        // Stream real de cámara (no canvas)
-let _hiddenCamVideo    = null;        // Video oculto para canvas stream
-let _canvasEl          = null;        // Canvas compartido
+let _rawCamStream      = null;
 
 // Permisos
 let permCamera   = false;
@@ -98,17 +96,17 @@ function show(name) {
 })();
 
 // ─── Constrains de video según cámara ────────────────────────────────────────
-// Frontal: 640x480 (4:3) — resolución baja fuerza al sensor a usar mayor
-//          área óptica, reduciendo el crop/zoom digital.
-// Trasera: 1920x1080 — calidad para documentos y personas.
+// Frontal: 1280x960 (4:3) — aspect ratio nativo del sensor, evita crop 16:9,
+//          resolución alta. El zoom API lleva el FoV al mínimo posible.
+// Trasera: 1920x1080 — calidad para documentos con autofocus continuo.
 function _videoConstraints(fm) {
   return fm === 'environment'
     ? { facingMode: fm, width: { ideal: 1920 }, height: { ideal: 1080 } }
-    : { facingMode: fm, width: { ideal: 640  }, height: { ideal: 480  } };
+    : { facingMode: fm, width: { ideal: 1280 }, height: { ideal: 960  } };
 }
 
 // ─── Post-proceso de pista: zoom mínimo + autofocus continuo ─────────────────
-async function _optimizeTrack(stream, fm) {
+async function _optimizeTrack(stream) {
   try {
     const track = stream.getVideoTracks()[0];
     if (!track) return;
@@ -120,56 +118,6 @@ async function _optimizeTrack(stream, fm) {
   } catch { /* API no soportada en este dispositivo */ }
 }
 
-// ─── Canvas stream – bypasea límite 720p de WebRTC en Android ────────────────
-// Crea canvas+loop una sola vez; al cambiar cámara solo actualiza srcObject.
-function _ensureCanvasLoop() {
-  if (_canvasEl) return;
-  _canvasEl = document.createElement('canvas');
-  _canvasEl.width  = 1920;
-  _canvasEl.height = 1080;
-  _hiddenCamVideo = document.createElement('video');
-  _hiddenCamVideo.muted = true;
-  _hiddenCamVideo.playsInline = true;
-  const ctx = _canvasEl.getContext('2d', { alpha: false });
-  ctx.imageSmoothingEnabled  = true;
-  ctx.imageSmoothingQuality  = 'high';
-  const MAX_W = 1920, MAX_H = 1080;
-  (function draw() {
-    const vw = _hiddenCamVideo.videoWidth;
-    const vh = _hiddenCamVideo.videoHeight;
-    if (_hiddenCamVideo.readyState >= 2 && vw && vh) {
-      // Recalcular dimensiones si la cámara cambió (rotación del teléfono)
-      const scale = Math.min(MAX_W / vw, MAX_H / vh);
-      const cw = Math.round(vw * scale);
-      const ch = Math.round(vh * scale);
-      if (_canvasEl.width !== cw || _canvasEl.height !== ch) {
-        _canvasEl.width  = cw;
-        _canvasEl.height = ch;
-        // Restaurar calidad tras resize (el contexto se resetea al cambiar dims)
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-      }
-      ctx.drawImage(_hiddenCamVideo, 0, 0, cw, ch);
-    }
-    requestAnimationFrame(draw);
-  })();
-}
-
-function buildCanvasStream(rawStream) {
-  return new Promise((resolve) => {
-    _ensureCanvasLoop();
-    const videoTrack = rawStream.getVideoTracks()[0];
-    _hiddenCamVideo.srcObject = new MediaStream([videoTrack]);
-    _hiddenCamVideo.addEventListener('loadedmetadata', () => {
-      _hiddenCamVideo.play();
-      const canvasStream = _canvasEl.captureStream(30);
-      resolve(new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...rawStream.getAudioTracks(),
-      ]));
-    }, { once: true });
-  });
-}
 
 // ─── Solicitar permisos ───────────────────────────────────────────────────────
 async function requestPermissions() {
@@ -187,7 +135,7 @@ async function requestPermissions() {
         audio: true,
       });
 
-      await _optimizeTrack(_rawCamStream, facingMode);
+      await _optimizeTrack(_rawCamStream);
 
       // Re-enumerar cámaras DESPUÉS de obtener el permiso (corrección iOS Safari:
       // antes del permiso solo devuelve 1 dispositivo aunque haya más)
@@ -196,7 +144,8 @@ async function requestPermissions() {
         hasMultipleCameras = devs.filter((d) => d.kind === 'videoinput').length > 1;
       } catch { /* mantener valor anterior */ }
 
-      localStream = await buildCanvasStream(_rawCamStream);
+      // Stream directo al WebRTC — sin canvas intermediario para máxima calidad
+      localStream = _rawCamStream;
       permCamera = true;
       permMic    = true;
       setPermStatus('status-camera', 'Concedido', 'perm-camera');
@@ -270,21 +219,19 @@ async function flipCamera() {
       audio: false,
     });
 
-    await _optimizeTrack(_rawCamStream, facingMode);
+    await _optimizeTrack(_rawCamStream);
 
-    // Actualizar hidden video — el canvas loop lo pinta automáticamente
+    // Actualizar stream local y reemplazar pista en WebRTC sin renegociar
+    localStream = _rawCamStream;
     const newVideoTrack = _rawCamStream.getVideoTracks()[0];
-    // El loop de canvas actualiza dimensiones automáticamente al cambiar el video
-    _hiddenCamVideo.srcObject = new MediaStream([newVideoTrack]);
-    await _hiddenCamVideo.play();
+    const sender = pc?.getSenders().find((s) => s.track?.kind === 'video');
+    if (sender) await sender.replaceTrack(newVideoTrack);
 
-    // Actualizar preview local
+    // Actualizar previews visuales
     const previewEl   = document.getElementById('preview-video');
     const localCallEl = document.getElementById('join-local-video');
-    if (previewEl   && previewEl.srcObject)   previewEl.srcObject   = _rawCamStream;
-    if (localCallEl && localCallEl.srcObject) localCallEl.srcObject = _rawCamStream;
-
-    // El canvas stream ya está en el PeerConnection — no hay que reemplazar nada
+    if (previewEl)   previewEl.srcObject   = _rawCamStream;
+    if (localCallEl) localCallEl.srcObject = _rawCamStream;
   } catch (err) {
     console.warn('[flipCamera] Error:', err.message);
     // Revertir facingMode si falla
