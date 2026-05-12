@@ -114,13 +114,26 @@ async function _applyMinZoom(stream) {
 function _ensureCanvasLoop() {
   if (_canvasEl) return;
   _canvasEl = document.createElement('canvas');
+  _canvasEl.width  = 1280;
+  _canvasEl.height = 720;
   _hiddenCamVideo = document.createElement('video');
   _hiddenCamVideo.muted = true;
   _hiddenCamVideo.playsInline = true;
   const ctx = _canvasEl.getContext('2d', { alpha: false });
+  const MAX_W = 1280, MAX_H = 720;
   (function draw() {
-    if (_hiddenCamVideo.readyState >= 2) {
-      ctx.drawImage(_hiddenCamVideo, 0, 0, _canvasEl.width, _canvasEl.height);
+    const vw = _hiddenCamVideo.videoWidth;
+    const vh = _hiddenCamVideo.videoHeight;
+    if (_hiddenCamVideo.readyState >= 2 && vw && vh) {
+      // Recalcular dimensiones si la cámara cambió (rotación del teléfono)
+      const scale = Math.min(MAX_W / vw, MAX_H / vh);
+      const cw = Math.round(vw * scale);
+      const ch = Math.round(vh * scale);
+      if (_canvasEl.width !== cw || _canvasEl.height !== ch) {
+        _canvasEl.width  = cw;
+        _canvasEl.height = ch;
+      }
+      ctx.drawImage(_hiddenCamVideo, 0, 0, cw, ch);
     }
     requestAnimationFrame(draw);
   })();
@@ -130,15 +143,6 @@ function buildCanvasStream(rawStream) {
   return new Promise((resolve) => {
     _ensureCanvasLoop();
     const videoTrack = rawStream.getVideoTracks()[0];
-    const settings   = videoTrack.getSettings();
-    // Escalar canvas respetando el aspect ratio original para no distorsionar.
-    const MAX_W = 1280, MAX_H = 720;
-    const srcW  = settings.width  || MAX_W;
-    const srcH  = settings.height || MAX_H;
-    const scale = Math.min(MAX_W / srcW, MAX_H / srcH);
-    _canvasEl.width  = Math.round(srcW * scale);
-    _canvasEl.height = Math.round(srcH * scale);
-
     _hiddenCamVideo.srcObject = new MediaStream([videoTrack]);
     _hiddenCamVideo.addEventListener('loadedmetadata', () => {
       _hiddenCamVideo.play();
@@ -163,12 +167,7 @@ async function requestPermissions() {
     // Cámara + micrófono
     try {
       _rawCamStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode,
-          width:     { ideal: 1920 },
-          height:    { ideal: 1080 },
-          frameRate: { ideal: 30 },
-        },
+        video: { facingMode },
         audio: true,
       });
 
@@ -252,12 +251,7 @@ async function flipCamera() {
 
     // Obtener nueva pista con el facing contrario
     _rawCamStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode,
-        width:     { ideal: 1920 },
-        height:    { ideal: 1080 },
-        frameRate: { ideal: 30 },
-      },
+      video: { facingMode },
       audio: false,
     });
 
@@ -265,13 +259,7 @@ async function flipCamera() {
 
     // Actualizar hidden video — el canvas loop lo pinta automáticamente
     const newVideoTrack = _rawCamStream.getVideoTracks()[0];
-    const settings = newVideoTrack.getSettings();
-    const MAX_W = 1280, MAX_H = 720;
-    const srcW  = settings.width  || MAX_W;
-    const srcH  = settings.height || MAX_H;
-    const scale = Math.min(MAX_W / srcW, MAX_H / srcH);
-    _canvasEl.width  = Math.round(srcW * scale);
-    _canvasEl.height = Math.round(srcH * scale);
+    // El loop de canvas actualiza dimensiones automáticamente al cambiar el video
     _hiddenCamVideo.srcObject = new MediaStream([newVideoTrack]);
     await _hiddenCamVideo.play();
 
