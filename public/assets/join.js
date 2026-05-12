@@ -98,12 +98,13 @@ function show(name) {
 })();
 
 // ─── Constrains de video según cámara ────────────────────────────────────────
-// Frontal: 720p — evita crop digital que causa zoom excesivo
-// Trasera: 1080p — calidad suficiente para ver documentos y personas
+// Frontal: 640x480 (4:3) — resolución baja fuerza al sensor a usar mayor
+//          área óptica, reduciendo el crop/zoom digital.
+// Trasera: 1920x1080 — calidad para documentos y personas.
 function _videoConstraints(fm) {
   return fm === 'environment'
     ? { facingMode: fm, width: { ideal: 1920 }, height: { ideal: 1080 } }
-    : { facingMode: fm, width: { ideal: 1280 }, height: { ideal: 720  } };
+    : { facingMode: fm, width: { ideal: 640  }, height: { ideal: 480  } };
 }
 
 // ─── Post-proceso de pista: zoom mínimo + autofocus continuo ─────────────────
