@@ -97,16 +97,26 @@ function show(name) {
   }
 })();
 
-// ─── Zoom mínimo – amplía el FoV al máximo que permite la cámara ─────────────
-async function _applyMinZoom(stream) {
+// ─── Constrains de video según cámara ────────────────────────────────────────
+// Frontal: 720p — evita crop digital que causa zoom excesivo
+// Trasera: 1080p — calidad suficiente para ver documentos y personas
+function _videoConstraints(fm) {
+  return fm === 'environment'
+    ? { facingMode: fm, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    : { facingMode: fm, width: { ideal: 1280 }, height: { ideal: 720  } };
+}
+
+// ─── Post-proceso de pista: zoom mínimo + autofocus continuo ─────────────────
+async function _optimizeTrack(stream, fm) {
   try {
     const track = stream.getVideoTracks()[0];
     if (!track) return;
-    const caps = track.getCapabilities?.();
-    if (caps?.zoom) {
-      await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
-    }
-  } catch { /* el dispositivo no soporta zoom API, se ignora */ }
+    const caps = track.getCapabilities?.() ?? {};
+    const advanced = [];
+    if (caps.zoom)      advanced.push({ zoom: caps.zoom.min });
+    if (caps.focusMode) advanced.push({ focusMode: 'continuous' });
+    if (advanced.length) await track.applyConstraints({ advanced });
+  } catch { /* API no soportada en este dispositivo */ }
 }
 
 // ─── Canvas stream – bypasea límite 720p de WebRTC en Android ────────────────
@@ -167,12 +177,11 @@ async function requestPermissions() {
     // Cámara + micrófono
     try {
       _rawCamStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: _videoConstraints(facingMode),
         audio: true,
       });
 
-      // Forzar zoom mínimo para máximo ángulo de visión (FoV amplio)
-      await _applyMinZoom(_rawCamStream);
+      await _optimizeTrack(_rawCamStream, facingMode);
 
       // Re-enumerar cámaras DESPUÉS de obtener el permiso (corrección iOS Safari:
       // antes del permiso solo devuelve 1 dispositivo aunque haya más)
@@ -251,11 +260,11 @@ async function flipCamera() {
 
     // Obtener nueva pista con el facing contrario
     _rawCamStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode },
+      video: _videoConstraints(facingMode),
       audio: false,
     });
 
-    await _applyMinZoom(_rawCamStream);
+    await _optimizeTrack(_rawCamStream, facingMode);
 
     // Actualizar hidden video — el canvas loop lo pinta automáticamente
     const newVideoTrack = _rawCamStream.getVideoTracks()[0];
