@@ -125,13 +125,15 @@ async function _optimizeTrack(stream, fm) {
 function _ensureCanvasLoop() {
   if (_canvasEl) return;
   _canvasEl = document.createElement('canvas');
-  _canvasEl.width  = 1280;
-  _canvasEl.height = 720;
+  _canvasEl.width  = 1920;
+  _canvasEl.height = 1080;
   _hiddenCamVideo = document.createElement('video');
   _hiddenCamVideo.muted = true;
   _hiddenCamVideo.playsInline = true;
   const ctx = _canvasEl.getContext('2d', { alpha: false });
-  const MAX_W = 1280, MAX_H = 720;
+  ctx.imageSmoothingEnabled  = true;
+  ctx.imageSmoothingQuality  = 'high';
+  const MAX_W = 1920, MAX_H = 1080;
   (function draw() {
     const vw = _hiddenCamVideo.videoWidth;
     const vh = _hiddenCamVideo.videoHeight;
@@ -143,6 +145,9 @@ function _ensureCanvasLoop() {
       if (_canvasEl.width !== cw || _canvasEl.height !== ch) {
         _canvasEl.width  = cw;
         _canvasEl.height = ch;
+        // Restaurar calidad tras resize (el contexto se resetea al cambiar dims)
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
       }
       ctx.drawImage(_hiddenCamVideo, 0, 0, cw, ch);
     }
@@ -157,7 +162,7 @@ function buildCanvasStream(rawStream) {
     _hiddenCamVideo.srcObject = new MediaStream([videoTrack]);
     _hiddenCamVideo.addEventListener('loadedmetadata', () => {
       _hiddenCamVideo.play();
-      const canvasStream = _canvasEl.captureStream(24);
+      const canvasStream = _canvasEl.captureStream(30);
       resolve(new MediaStream([
         ...canvasStream.getVideoTracks(),
         ...rawStream.getAudioTracks(),
