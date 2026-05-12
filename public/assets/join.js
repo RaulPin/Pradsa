@@ -118,6 +118,87 @@ async function _optimizeTrack(stream) {
   } catch { /* API no soportada en este dispositivo */ }
 }
 
+// ─── Detectar y cambiar a cámara frontal gran angular ────────────────────────
+// Prueba todos los videoinput disponibles (excluyendo traseros y el actual),
+// elige el que tenga menor zoom mínimo (FoV más amplio) o label "wide/ultra".
+// Se llama en background sin bloquear la UI.
+async function _tryWidestFrontCamera() {
+  try {
+    const devices   = await navigator.mediaDevices.enumerateDevices();
+    const inputs    = devices.filter(d => d.kind === 'videoinput');
+    if (inputs.length <= 1) return;
+
+    const currentTrack = _rawCamStream?.getVideoTracks()[0];
+    if (!currentTrack) return;
+    const currentId     = currentTrack.getSettings().deviceId;
+    const currentCaps   = currentTrack.getCapabilities?.() ?? {};
+    const currentMinZoom = currentCaps.zoom?.min ?? 1;
+
+    const REAR_KW = ['back', 'rear', 'environment', 'trasera', 'posterior'];
+    const WIDE_KW = ['wide', 'ultra', 'gran angular', '0.6', 'ultrawide'];
+
+    const candidates = inputs.filter(d => {
+      if (!d.deviceId || d.deviceId === currentId || d.deviceId === 'default') return false;
+      const lbl = d.label.toLowerCase();
+      return !REAR_KW.some(kw => lbl.includes(kw));
+    }).sort((a, b) => {
+      const aW = WIDE_KW.some(kw => a.label.toLowerCase().includes(kw));
+      const bW = WIDE_KW.some(kw => b.label.toLowerCase().includes(kw));
+      return (bW ? 1 : 0) - (aW ? 1 : 0); // wide-label primero
+    });
+
+    if (!candidates.length) return;
+
+    let bestId      = null;
+    let bestMinZoom = currentMinZoom;
+    const toStop    = [];
+
+    for (const dev of candidates) {
+      try {
+        const ts  = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: dev.deviceId } } });
+        const trk = ts.getVideoTracks()[0];
+        const caps = trk.getCapabilities?.() ?? {};
+        const minZoom = caps.zoom?.min ?? 1;
+        const isWideLabel = WIDE_KW.some(kw => dev.label.toLowerCase().includes(kw));
+        toStop.push(ts);
+
+        if (isWideLabel || minZoom < bestMinZoom) {
+          bestMinZoom = minZoom;
+          bestId      = dev.deviceId;
+          if (isWideLabel) break; // label es definitivo, no seguir probando
+        }
+      } catch { /* cámara no accesible */ }
+    }
+
+    toStop.forEach(s => s.getTracks().forEach(t => t.stop()));
+    if (!bestId) return;
+
+    // Cambiar al lente más amplio
+    const audio = _rawCamStream.getAudioTracks();
+    _rawCamStream.getVideoTracks().forEach(t => t.stop());
+
+    const wideStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: bestId }, width: { ideal: 1280 }, height: { ideal: 960 } },
+    });
+    await _optimizeTrack(wideStream);
+
+    _rawCamStream = new MediaStream([...wideStream.getVideoTracks(), ...audio]);
+    localStream   = _rawCamStream;
+
+    const previewEl   = document.getElementById('preview-video');
+    const localCallEl = document.getElementById('join-local-video');
+    if (previewEl)   previewEl.srcObject   = _rawCamStream;
+    if (localCallEl) localCallEl.srcObject = _rawCamStream;
+
+    const sender = pc?.getSenders().find(s => s.track?.kind === 'video');
+    if (sender) await sender.replaceTrack(wideStream.getVideoTracks()[0]);
+
+    console.info('[camera] Cambiado a cámara gran angular frontal:', bestId);
+  } catch (e) {
+    console.warn('[wideCamera]', e.message);
+  }
+}
+
 
 // ─── Solicitar permisos ───────────────────────────────────────────────────────
 async function requestPermissions() {
@@ -146,6 +227,10 @@ async function requestPermissions() {
 
       // Stream directo al WebRTC — sin canvas intermediario para máxima calidad
       localStream = _rawCamStream;
+
+      // Buscar cámara gran angular en background (no bloquea el flujo de UI)
+      _tryWidestFrontCamera().catch(() => {});
+
       permCamera = true;
       permMic    = true;
       setPermStatus('status-camera', 'Concedido', 'perm-camera');
