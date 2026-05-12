@@ -119,13 +119,15 @@ function buildCanvasStream(rawStream) {
     _ensureCanvasLoop();
     const videoTrack = rawStream.getVideoTracks()[0];
     const settings   = videoTrack.getSettings();
-    _canvasEl.width  = settings.width  || 1920;
-    _canvasEl.height = settings.height || 1080;
+    // Limitar canvas a 1280×720 — reduce CPU y ancho de banda WebRTC.
+    // _rawCamStream sigue disponible en alta resolución para fotos.
+    _canvasEl.width  = Math.min(settings.width  || 1280, 1280);
+    _canvasEl.height = Math.min(settings.height || 720,  720);
 
     _hiddenCamVideo.srcObject = new MediaStream([videoTrack]);
     _hiddenCamVideo.addEventListener('loadedmetadata', () => {
       _hiddenCamVideo.play();
-      const canvasStream = _canvasEl.captureStream(30);
+      const canvasStream = _canvasEl.captureStream(24);
       resolve(new MediaStream([
         ...canvasStream.getVideoTracks(),
         ...rawStream.getAudioTracks(),
@@ -148,8 +150,8 @@ async function requestPermissions() {
       _rawCamStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode,
-          width:     { ideal: 3840 },
-          height:    { ideal: 2160 },
+          width:     { ideal: 1920 },
+          height:    { ideal: 1080 },
           frameRate: { ideal: 30 },
         },
         audio: true,
@@ -234,8 +236,8 @@ async function flipCamera() {
     _rawCamStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode,
-        width:     { ideal: 3840 },
-        height:    { ideal: 2160 },
+        width:     { ideal: 1920 },
+        height:    { ideal: 1080 },
         frameRate: { ideal: 30 },
       },
       audio: false,
@@ -244,8 +246,8 @@ async function flipCamera() {
     // Actualizar hidden video — el canvas loop lo pinta automáticamente
     const newVideoTrack = _rawCamStream.getVideoTracks()[0];
     const settings = newVideoTrack.getSettings();
-    _canvasEl.width  = settings.width  || 1920;
-    _canvasEl.height = settings.height || 1080;
+    _canvasEl.width  = Math.min(settings.width  || 1280, 1280);
+    _canvasEl.height = Math.min(settings.height || 720,  720);
     _hiddenCamVideo.srcObject = new MediaStream([newVideoTrack]);
     await _hiddenCamVideo.play();
 
