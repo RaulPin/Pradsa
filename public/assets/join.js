@@ -119,10 +119,13 @@ function buildCanvasStream(rawStream) {
     _ensureCanvasLoop();
     const videoTrack = rawStream.getVideoTracks()[0];
     const settings   = videoTrack.getSettings();
-    // Limitar canvas a 1280×720 — reduce CPU y ancho de banda WebRTC.
-    // _rawCamStream sigue disponible en alta resolución para fotos.
-    _canvasEl.width  = Math.min(settings.width  || 1280, 1280);
-    _canvasEl.height = Math.min(settings.height || 720,  720);
+    // Escalar canvas respetando el aspect ratio original para no distorsionar.
+    const MAX_W = 1280, MAX_H = 720;
+    const srcW  = settings.width  || MAX_W;
+    const srcH  = settings.height || MAX_H;
+    const scale = Math.min(MAX_W / srcW, MAX_H / srcH);
+    _canvasEl.width  = Math.round(srcW * scale);
+    _canvasEl.height = Math.round(srcH * scale);
 
     _hiddenCamVideo.srcObject = new MediaStream([videoTrack]);
     _hiddenCamVideo.addEventListener('loadedmetadata', () => {
@@ -246,8 +249,12 @@ async function flipCamera() {
     // Actualizar hidden video — el canvas loop lo pinta automáticamente
     const newVideoTrack = _rawCamStream.getVideoTracks()[0];
     const settings = newVideoTrack.getSettings();
-    _canvasEl.width  = Math.min(settings.width  || 1280, 1280);
-    _canvasEl.height = Math.min(settings.height || 720,  720);
+    const MAX_W = 1280, MAX_H = 720;
+    const srcW  = settings.width  || MAX_W;
+    const srcH  = settings.height || MAX_H;
+    const scale = Math.min(MAX_W / srcW, MAX_H / srcH);
+    _canvasEl.width  = Math.round(srcW * scale);
+    _canvasEl.height = Math.round(srcH * scale);
     _hiddenCamVideo.srcObject = new MediaStream([newVideoTrack]);
     await _hiddenCamVideo.play();
 
