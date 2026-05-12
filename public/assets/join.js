@@ -97,6 +97,18 @@ function show(name) {
   }
 })();
 
+// ─── Zoom mínimo – amplía el FoV al máximo que permite la cámara ─────────────
+async function _applyMinZoom(stream) {
+  try {
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.();
+    if (caps?.zoom) {
+      await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+    }
+  } catch { /* el dispositivo no soporta zoom API, se ignora */ }
+}
+
 // ─── Canvas stream – bypasea límite 720p de WebRTC en Android ────────────────
 // Crea canvas+loop una sola vez; al cambiar cámara solo actualiza srcObject.
 function _ensureCanvasLoop() {
@@ -159,6 +171,9 @@ async function requestPermissions() {
         },
         audio: true,
       });
+
+      // Forzar zoom mínimo para máximo ángulo de visión (FoV amplio)
+      await _applyMinZoom(_rawCamStream);
 
       // Re-enumerar cámaras DESPUÉS de obtener el permiso (corrección iOS Safari:
       // antes del permiso solo devuelve 1 dispositivo aunque haya más)
@@ -245,6 +260,8 @@ async function flipCamera() {
       },
       audio: false,
     });
+
+    await _applyMinZoom(_rawCamStream);
 
     // Actualizar hidden video — el canvas loop lo pinta automáticamente
     const newVideoTrack = _rawCamStream.getVideoTracks()[0];
