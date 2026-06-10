@@ -343,6 +343,14 @@ async function generatePymeWord(req, res) {
     ['foto_inventario',         'Inventario'],
     ['foto_maquinaria',         'Maquinaria y equipo'],
     ['foto_oficinas',           'Oficinas y atención'],
+    ['foto_extra_1',            'Foto adicional 1'],
+    ['foto_extra_2',            'Foto adicional 2'],
+    ['foto_extra_3',            'Foto adicional 3'],
+    ['foto_extra_4',            'Foto adicional 4'],
+    ['foto_extra_5',            'Foto adicional 5'],
+    ['foto_extra_6',            'Foto adicional 6'],
+    ['foto_extra_7',            'Foto adicional 7'],
+    ['foto_extra_8',            'Foto adicional 8'],
   ];
   const imgs = {};
   PYME_SLOTS.forEach(([k]) => { const fn = val(r,k); imgs[k] = fn ? photoBuffer(id, fn) : null; });
@@ -540,18 +548,21 @@ async function generatePymeWord(req, res) {
           h('Fotografías'),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [
-              new TableRow({ children: [
-                photoCell(imgs['foto_vialidad'],   'Vialidad'),
-                photoCell(imgs['foto_fachada'],    'Ejecutivo en fachada'),
-                photoCell(imgs['foto_interior_ejecutivo'], 'Ejecutivo en interior'),
-              ]}),
-              new TableRow({ children: [
-                photoCell(imgs['foto_inventario'], 'Inventario'),
-                photoCell(imgs['foto_maquinaria'], 'Maquinaria y equipo'),
-                photoCell(imgs['foto_oficinas'],   'Oficinas y atención'),
-              ]}),
-            ],
+            rows: (() => {
+              const photoRows = [];
+              for (let i = 0; i < PYME_SLOTS.length; i += 3) {
+                const rowEntries = PYME_SLOTS.slice(i, i + 3);
+                while (rowEntries.length < 3) rowEntries.push(null);
+                photoRows.push(new TableRow({
+                  children: rowEntries.map((entry) => {
+                    if (!entry) return new TableCell({ borders: BORDER, children: [new Paragraph({ children: [] })] });
+                    const [k, defaultLabel] = entry;
+                    return photoCell(imgs[k], val(r, k + '_label', defaultLabel));
+                  }),
+                }));
+              }
+              return photoRows;
+            })(),
           }),
         ] : []),
 

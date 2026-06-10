@@ -153,6 +153,22 @@
   line-height: 1.4;
 }
 
+.photo-slot-label-input {
+  display: block;
+  width: 100%;
+  background: rgba(255,255,255,.04);
+  padding: .5rem .7rem;
+  font-size: .78rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text, #e2e8f0);
+  line-height: 1.4;
+  outline: none;
+}
+.photo-slot-label-input::placeholder { color: var(--muted, #64748b); font-weight: 400; }
+.photo-slot-label-input:focus { background: rgba(255,255,255,.08); }
+
 .photo-slot-select {
   width: 100%;
   border-radius: 0;

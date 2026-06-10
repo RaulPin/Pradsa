@@ -436,6 +436,14 @@ function generatePymeReport(req, res) {
     ['foto_inventario',         'Inventario'],
     ['foto_maquinaria',         'Maquinaria y Equipo'],
     ['foto_oficinas',           'Oficinas y Atención al Cliente'],
+    ['foto_extra_1',            'Foto adicional 1'],
+    ['foto_extra_2',            'Foto adicional 2'],
+    ['foto_extra_3',            'Foto adicional 3'],
+    ['foto_extra_4',            'Foto adicional 4'],
+    ['foto_extra_5',            'Foto adicional 5'],
+    ['foto_extra_6',            'Foto adicional 6'],
+    ['foto_extra_7',            'Foto adicional 7'],
+    ['foto_extra_8',            'Foto adicional 8'],
   ];
 
   const slotImgs = {};
@@ -450,7 +458,8 @@ function generatePymeReport(req, res) {
     return v === 'si' ? 'SÍ' : 'NO';
   };
 
-  const photoCell = (key, label) => {
+  const photoCell = (key, defaultLabel) => {
+    const label = val(r, key + '_label', defaultLabel);
     const img = slotImgs[key];
     return `
       <div class="photo-cell">
@@ -712,7 +721,7 @@ function generatePymeReport(req, res) {
 
   <div class="footer-line">
     <span>${val(r,'razon_social')} · Pyme</span>
-    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 1/3</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 1/4</span>
   </div>
 </div><!-- /page 1 -->
 
@@ -738,11 +747,32 @@ function generatePymeReport(req, res) {
 
   <div class="footer-line">
     <span>${val(r,'razon_social')} · Pyme</span>
-    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 2/3</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 2/4</span>
   </div>
 </div><!-- /page 2 -->
 
-<!-- ══ PÁGINA 3 ══ -->
+<!-- ══ PÁGINA 3 – FOTOGRAFÍAS ADICIONALES ══ -->
+<div class="page">
+
+  <div style="margin-bottom:1.5mm;font-weight:700;font-size:8pt;background:#dce3ed;border:1px solid #999;padding:1.5mm 3mm;">F) FOTOGRAFÍAS ADICIONALES</div>
+  <div class="photos-grid-3">
+    ${photoCell('foto_extra_1', 'Foto adicional 1')}
+    ${photoCell('foto_extra_2', 'Foto adicional 2')}
+    ${photoCell('foto_extra_3', 'Foto adicional 3')}
+    ${photoCell('foto_extra_4', 'Foto adicional 4')}
+    ${photoCell('foto_extra_5', 'Foto adicional 5')}
+    ${photoCell('foto_extra_6', 'Foto adicional 6')}
+    ${photoCell('foto_extra_7', 'Foto adicional 7')}
+    ${photoCell('foto_extra_8', 'Foto adicional 8')}
+  </div>
+
+  <div class="footer-line" style="margin-top:3mm;">
+    <span>${val(r,'razon_social')} · Pyme</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 3/4</span>
+  </div>
+</div><!-- /page 3 -->
+
+<!-- ══ PÁGINA 4 ══ -->
 <div class="page">
 
   <!-- G: Comentarios -->
@@ -797,9 +827,9 @@ function generatePymeReport(req, res) {
 
   <div class="footer-line" style="margin-top:6mm;">
     <span>${val(r,'razon_social')} · Pyme</span>
-    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 3/3</span>
+    <span>Generado por FieldCheck · ${interviewer?.name || ''} · 4/4</span>
   </div>
-</div><!-- /page 3 -->
+</div><!-- /page 4 -->
 
 </body>
 </html>`;

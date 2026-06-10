@@ -10,6 +10,14 @@ const PHOTO_SLOTS = [
   'foto_inventario',
   'foto_maquinaria',
   'foto_oficinas',
+  'foto_extra_1',
+  'foto_extra_2',
+  'foto_extra_3',
+  'foto_extra_4',
+  'foto_extra_5',
+  'foto_extra_6',
+  'foto_extra_7',
+  'foto_extra_8',
 ];
 
 let photos = [];
