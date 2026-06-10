@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FieldCheck – Sesión</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body class="call-page">
+
+  <!-- HEADER DE SESIÓN -->
+  <header class="call-header">
+    <div class="call-brand">
+      <span class="logo-mark sm">FC</span>
+      <span id="call-title" class="call-title">Cargando…</span>
+      <span id="call-type-badge" class="badge"></span>
+    </div>
+    <div class="call-meta">
+      <span id="call-timer" class="call-timer">00:00</span>
+      <span id="conn-status" class="conn-dot connecting" title="Conectando…"></span>
+    </div>
+  </header>
+
+  <!-- ESTADO / ALERTA -->
+  <div id="call-status-bar" class="status-bar" hidden></div>
+
+  <!-- CUERPO PRINCIPAL -->
+  <div class="call-body">
+
+    <!-- VIDEOS -->
+    <div class="video-grid">
+      <div class="video-cell" id="remote-cell">
+        <video id="remote-video" playsinline autoplay></video>
+        <span class="video-label" id="remote-label">Entrevistado</span>
+        <div class="video-placeholder" id="remote-placeholder">
+          <div class="avatar-icon">👤</div>
+          <p>Esperando al entrevistado…</p>
+        </div>
+      </div>
+      <div class="video-cell local-cell">
+        <video id="local-video" playsinline autoplay muted></video>
+        <span class="video-label">Tú</span>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="call-sidebar">
+
+      <!-- Calidad -->
+      <div class="sidebar-section">
+        <div id="quality-info" class="quality-info"></div>
+      </div>
+
+      <!-- Ubicación del entrevistado -->
+      <div class="sidebar-section">
+        <h3>Ubicación del entrevistado</h3>
+        <div id="location-info" class="location-info">
+          <p class="muted">Pendiente de recibir…</p>
+        </div>
+      </div>
+
+      <!-- Notas -->
+      <div class="sidebar-section flex-grow">
+        <h3>Notas privadas</h3>
+        <textarea id="notes" class="notes-area" placeholder="Escribe tus notas (solo visibles para ti)…"></textarea>
+      </div>
+
+      <!-- Fotos capturadas -->
+      <div class="sidebar-section">
+        <div class="sidebar-header-row">
+          <h3>Fotografías (<span id="photo-count">0</span>)</h3>
+          <button id="btn-capture" class="btn btn-sm btn-accent">📷 Capturar</button>
+        </div>
+        <div id="photo-gallery" class="photo-gallery"></div>
+      </div>
+
+      <!-- Cuestionario -->
+      <div class="sidebar-section">
+        <h3>Cuestionario</h3>
+        <div id="questionnaire-area">
+          <p class="muted" style="font-size:.85rem;margin-bottom:.75rem;">Abre el cuestionario Fiduciario en una nueva pestaña para llenarlo durante la llamada.</p>
+          <button id="btn-questionnaire" class="btn btn-sm btn-primary" style="width:100%;">📋 Abrir Cuestionario</button>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- Indicador de grabación -->
+  <div id="rec-indicator" class="rec-indicator" hidden>
+    <span class="rec-dot"></span> REC
+  </div>
+
+  <!-- CONTROLES -->
+  <div class="call-controls">
+    <button id="btn-mute" class="ctrl-btn" title="Silenciar micrófono">
+      <span class="ctrl-icon">🎤</span>
+      <span class="ctrl-label">Silenciar</span>
+    </button>
+    <button id="btn-video" class="ctrl-btn" title="Pausar cámara">
+      <span class="ctrl-icon">📹</span>
+      <span class="ctrl-label">Cámara</span>
+    </button>
+    <button id="btn-screen" class="ctrl-btn" title="Compartir pantalla">
+      <span class="ctrl-icon">🖥</span>
+      <span class="ctrl-label">Pantalla</span>
+    </button>
+    <button id="btn-end" class="ctrl-btn ctrl-danger" title="Finalizar llamada">
+      <span class="ctrl-icon">📵</span>
+      <span class="ctrl-label">Finalizar</span>
+    </button>
+  </div>
+
+  <!-- Canvas oculto para captura de fotos -->
+  <canvas id="capture-canvas" style="display:none;"></canvas>
+
+  <script src="/assets/interview.js" type="module"></script>
+</body>
+</html>

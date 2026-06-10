@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expediente – FieldCheck</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+  <link rel="stylesheet" href="/assets/expediente.css" />
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <span class="logo-mark sm">FC</span>
+    <span class="nav-title">FieldCheck</span>
+  </div>
+  <div class="nav-user">
+    <a href="/dashboard" class="btn btn-ghost btn-sm">← Volver al panel</a>
+  </div>
+</nav>
+
+<main class="exp-container">
+
+  <!-- Encabezado del expediente -->
+  <div id="exp-header" class="exp-header">
+    <div class="exp-title-row">
+      <span id="exp-folio" class="exp-folio"></span>
+      <h1 id="exp-title" class="exp-title"></h1>
+    </div>
+    <div class="exp-badges">
+      <span id="exp-type-badge"  class="badge"></span>
+      <span id="exp-status-badge" class="badge"></span>
+    </div>
+    <div class="exp-meta-grid">
+      <div class="exp-meta-item"><span class="exp-meta-label">Entrevistado</span><span id="exp-interviewee"></span></div>
+      <div class="exp-meta-item"><span class="exp-meta-label">Entrevistador</span><span id="exp-interviewer"></span></div>
+      <div class="exp-meta-item"><span class="exp-meta-label">Fecha programada</span><span id="exp-date"></span></div>
+      <div class="exp-meta-item"><span class="exp-meta-label">Duración</span><span id="exp-duration"></span></div>
+      <div class="exp-meta-item"><span class="exp-meta-label">Geolocalización</span><span id="exp-geo"></span></div>
+      <div class="exp-meta-item"><span class="exp-meta-label">IP del entrevistado</span><span id="exp-ip"></span></div>
+    </div>
+  </div>
+
+  <!-- Grabación de video -->
+  <section class="exp-section" id="section-video">
+    <h2 class="exp-section-title">🎥 Grabación de la sesión</h2>
+    <div id="video-area">
+      <p class="exp-empty" id="no-recording">No hay grabación disponible para esta entrevista.</p>
+      <div id="video-player-wrap" hidden>
+        <video id="exp-video" class="exp-video" controls preload="metadata"></video>
+        <a id="btn-download-video" class="btn btn-ghost btn-sm" style="margin-top:.75rem;" download>⬇ Descargar grabación</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fotografías -->
+  <section class="exp-section" id="section-photos">
+    <h2 class="exp-section-title">📷 Fotografías capturadas <span id="photo-badge" class="badge badge-count"></span></h2>
+    <div id="exp-photos" class="exp-photos-grid">
+      <p class="exp-empty">No hay fotografías capturadas.</p>
+    </div>
+  </section>
+
+  <!-- Cuestionario / reporte -->
+  <section class="exp-section">
+    <h2 class="exp-section-title">📋 Cuestionario y reporte</h2>
+    <div id="questionnaire-status" class="exp-q-status">
+      <div id="q-status-msg" class="exp-q-label">Sin cuestionario guardado</div>
+      <div id="q-actions" class="exp-q-actions" hidden>
+        <a id="btn-open-q"   class="btn btn-primary btn-sm" target="_blank">Abrir cuestionario</a>
+        <button id="btn-mark-complete" class="btn btn-ghost btn-sm" hidden style="color:var(--success,#22c55e);border-color:var(--success,#22c55e)">✅ Marcar como completado</button>
+        <a id="btn-view-pdf" class="btn btn-ghost btn-sm"   target="_blank">📄 Ver PDF</a>
+        <a id="btn-dl-word"  class="btn btn-ghost btn-sm">📝 Descargar Word</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Notas internas -->
+  <section class="exp-section" id="section-notes" hidden>
+    <h2 class="exp-section-title">📝 Notas del entrevistador</h2>
+    <div id="exp-notes" class="exp-notes"></div>
+  </section>
+
+</main>
+
+<script src="/assets/expediente.js"></script>
+</body>
+</html>
