@@ -86,17 +86,5 @@ export function hashOtp(code: string): string {
   return crypto.createHmac('sha256', SECRET).update(code).digest('hex');
 }
 
-// ---------- Permisos por rol ----------
-export const ROLE_ROUTES: Record<string, Role[]> = {
-  '/dashboard': ['SUPER_ADMIN', 'CLIENT_FULL'],
-  '/upload': ['SUPER_ADMIN', 'UPLOADER'],
-  '/users': ['SUPER_ADMIN'],
-  '/audit': ['SUPER_ADMIN'],
-  '/folders': ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_FOLDER'],
-};
-
-export function canAccess(role: Role, path: string): boolean {
-  const match = Object.keys(ROLE_ROUTES).find((r) => path.startsWith(r));
-  if (!match) return true;
-  return ROLE_ROUTES[match].includes(role);
-}
+// Los chequeos de ruta por rol viven en `lib/auth-edge.ts` (canAccess / ROLE_ROUTES)
+// para ser compatibles con el Edge Runtime del middleware.

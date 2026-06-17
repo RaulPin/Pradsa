@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromRequest, canAccess } from '@/lib/auth';
+import { verifyTokenEdge, canAccess, landingFor, SESSION_COOKIE } from '@/lib/auth-edge';
 
 const PUBLIC_PATHS = ['/login', '/verify-otp', '/change-password'];
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const session = getSessionFromRequest(req);
+  const session = await verifyTokenEdge(req.cookies.get(SESSION_COOKIE)?.value);
 
   // Rutas públicas de auth: si ya hay sesión, mandar al inicio adecuado.
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
@@ -32,12 +32,6 @@ export function middleware(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
-
-function landingFor(role: string): string {
-  if (role === 'UPLOADER') return '/upload';
-  if (role === 'CLIENT_FOLDER') return '/folders';
-  return '/dashboard';
 }
 
 export const config = {
