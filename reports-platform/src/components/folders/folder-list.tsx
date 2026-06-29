@@ -6,26 +6,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog } from '@/components/ui/dialog';
+import { Select } from '@/components/ui/select';
 import { FolderCard } from './folder-card';
 import { CsvImportDialog } from './csv-import-dialog';
-import type { FolderWithStats, Role } from '@/types';
+import type { Banca, FolderWithStats, Role } from '@/types';
 
 export function FolderList({ role }: { role: Role }) {
   const [folders, setFolders] = useState<FolderWithStats[]>([]);
+  const [bancas, setBancas] = useState<Banca[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [csvOpen, setCsvOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', region_code: '', description: '' });
+  const [form, setForm] = useState({ name: '', region_code: '', description: '', banca_id: '' });
   const [saving, setSaving] = useState(false);
 
   const isAdmin = role === 'SUPER_ADMIN';
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/folders');
-    const data = await res.json();
-    setFolders(data.folders || []);
+    const [f, b] = await Promise.all([
+      fetch('/api/folders').then((r) => r.json()),
+      fetch('/api/bancas').then((r) => r.json()),
+    ]);
+    setFolders(f.folders || []);
+    setBancas(b.bancas || []);
     setLoading(false);
   }
 
@@ -36,11 +41,11 @@ export function FolderList({ role }: { role: Role }) {
     await fetch('/api/folders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, banca_id: form.banca_id || null }),
     });
     setSaving(false);
     setNewOpen(false);
-    setForm({ name: '', region_code: '', description: '' });
+    setForm({ name: '', region_code: '', description: '', banca_id: '' });
     load();
   }
 
@@ -88,6 +93,13 @@ export function FolderList({ role }: { role: Role }) {
       <Dialog open={newOpen} onClose={() => setNewOpen(false)} title="Nueva carpeta">
         <div className="space-y-3">
           <div><Label>Nombre</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+          <div>
+            <Label>Banca</Label>
+            <Select value={form.banca_id} onChange={(e) => setForm({ ...form, banca_id: e.target.value })}>
+              <option value="">— Sin banca —</option>
+              {bancas.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+          </div>
           <div><Label>Código de región</Label><Input value={form.region_code} onChange={(e) => setForm({ ...form, region_code: e.target.value })} /></div>
           <div><Label>Descripción</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           <div className="flex justify-end gap-2 pt-2">

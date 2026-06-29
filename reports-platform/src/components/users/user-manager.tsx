@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
-import { ROLE_LABELS, type Folder, type Role } from '@/types';
+import { ROLE_LABELS, type Banca, type Folder, type Role } from '@/types';
 
 interface UserRow {
   id: string;
@@ -18,12 +18,14 @@ interface UserRow {
   role: Role;
   is_active: boolean;
   folder_ids: string[];
+  banca_ids: string[];
 }
 
-const ROLE_TONE: Record<Role, 'purple' | 'blue' | 'green' | 'slate'> = {
+const ROLE_TONE: Record<Role, 'purple' | 'blue' | 'green' | 'amber' | 'slate'> = {
   SUPER_ADMIN: 'purple',
   UPLOADER: 'blue',
   CLIENT_FULL: 'green',
+  CLIENT_BANCA: 'amber',
   CLIENT_FOLDER: 'slate',
 };
 
@@ -104,20 +106,60 @@ function FolderPicker({
   );
 }
 
+// ---------- Selector de bancas reutilizable ----------
+function BancaPicker({
+  bancas,
+  selected,
+  onChange,
+}: {
+  bancas: Banca[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  function toggle(id: string, checked: boolean) {
+    onChange(checked ? [...selected, id] : selected.filter((x) => x !== id));
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 p-2">
+      {bancas.length === 0 && (
+        <p className="py-2 text-center text-xs text-slate-400">No hay bancas configuradas.</p>
+      )}
+      {bancas.map((b) => (
+        <label key={b.id} className="flex cursor-pointer items-center gap-2 rounded py-1 text-sm hover:bg-slate-50">
+          <input
+            type="checkbox"
+            checked={selected.includes(b.id)}
+            onChange={(e) => toggle(b.id, e.target.checked)}
+          />
+          <span className="rounded bg-slate-100 px-1 text-xs text-slate-500">{b.code}</span>
+          {b.name}
+        </label>
+      ))}
+      {selected.length > 0 && (
+        <p className="text-xs text-slate-500">Verá todas las carpetas de {selected.length} banca(s).</p>
+      )}
+    </div>
+  );
+}
+
 // ---------- Diálogo de edición ----------
 function EditUserDialog({
   user,
   folders,
+  bancas,
   onClose,
   onDone,
 }: {
   user: UserRow;
   folders: Folder[];
+  bancas: Banca[];
   onClose: () => void;
   onDone: () => void;
 }) {
   const [role, setRole] = useState<Role>(user.role);
   const [folderIds, setFolderIds] = useState<string[]>(user.folder_ids);
+  const [bancaIds, setBancaIds] = useState<string[]>(user.banca_ids);
   const [isActive, setIsActive] = useState(user.is_active);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -133,6 +175,7 @@ function EditUserDialog({
         role,
         is_active: isActive,
         folder_ids: role === 'CLIENT_FOLDER' ? folderIds : [],
+        banca_ids: role === 'CLIENT_BANCA' ? bancaIds : [],
       }),
     });
     const data = await res.json();
@@ -156,11 +199,20 @@ function EditUserDialog({
           <Label>Rol</Label>
           <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="CLIENT_FULL">Cliente (acceso total)</option>
+            <option value="CLIENT_BANCA">Administrativo de Banca</option>
             <option value="CLIENT_FOLDER">Cliente (carpeta específica)</option>
             <option value="UPLOADER">Cargador</option>
             <option value="SUPER_ADMIN">Administrador</option>
           </Select>
         </div>
+
+        {/* Bancas — solo aplica para CLIENT_BANCA */}
+        {role === 'CLIENT_BANCA' && (
+          <div>
+            <Label>Bancas asignadas</Label>
+            <BancaPicker bancas={bancas} selected={bancaIds} onChange={setBancaIds} />
+          </div>
+        )}
 
         {/* Carpetas — solo aplica para CLIENT_FOLDER */}
         {role === 'CLIENT_FOLDER' && (
@@ -200,6 +252,7 @@ function EditUserDialog({
 export function UserManager() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [bancas, setBancas] = useState<Banca[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRow | null>(null);
@@ -207,17 +260,19 @@ export function UserManager() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     email: '', full_name: '', role: 'CLIENT_FULL' as Role,
-    temp_password: randomPassword(), folder_ids: [] as string[],
+    temp_password: randomPassword(), folder_ids: [] as string[], banca_ids: [] as string[],
   });
 
   async function load() {
     setLoading(true);
-    const [u, f] = await Promise.all([
+    const [u, f, b] = await Promise.all([
       fetch('/api/users').then((r) => r.json()),
       fetch('/api/folders').then((r) => r.json()),
+      fetch('/api/bancas').then((r) => r.json()),
     ]);
     setUsers(u.users || []);
     setFolders(f.folders || []);
+    setBancas(b.bancas || []);
     setLoading(false);
   }
 
@@ -235,7 +290,7 @@ export function UserManager() {
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Error al crear usuario'); return; }
     setCreateOpen(false);
-    setForm({ email: '', full_name: '', role: 'CLIENT_FULL', temp_password: randomPassword(), folder_ids: [] });
+    setForm({ email: '', full_name: '', role: 'CLIENT_FULL', temp_password: randomPassword(), folder_ids: [], banca_ids: [] });
     load();
   }
 
@@ -272,9 +327,13 @@ export function UserManager() {
                   </TD>
                   <TD><Badge tone={ROLE_TONE[u.role]}>{ROLE_LABELS[u.role]}</Badge></TD>
                   <TD>
-                    {u.role === 'CLIENT_FOLDER'
-                      ? <span className="text-sm">{u.folder_ids.length} asignada(s)</span>
-                      : <span className="text-sm text-slate-400">Todas</span>}
+                    {u.role === 'CLIENT_FOLDER' ? (
+                      <span className="text-sm">{u.folder_ids.length} carpeta(s)</span>
+                    ) : u.role === 'CLIENT_BANCA' ? (
+                      <span className="text-sm">{u.banca_ids.length} banca(s)</span>
+                    ) : (
+                      <span className="text-sm text-slate-400">Todas</span>
+                    )}
                   </TD>
                   <TD>
                     {u.is_active
@@ -309,6 +368,7 @@ export function UserManager() {
         <EditUserDialog
           user={editUser}
           folders={folders}
+          bancas={bancas}
           onClose={() => setEditUser(null)}
           onDone={load}
         />
@@ -329,11 +389,22 @@ export function UserManager() {
             <Label>Rol</Label>
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
               <option value="CLIENT_FULL">Cliente (acceso total)</option>
+              <option value="CLIENT_BANCA">Administrativo de Banca</option>
               <option value="CLIENT_FOLDER">Cliente (carpeta específica)</option>
               <option value="UPLOADER">Cargador</option>
               <option value="SUPER_ADMIN">Administrador</option>
             </Select>
           </div>
+          {form.role === 'CLIENT_BANCA' && (
+            <div>
+              <Label>Bancas asignadas</Label>
+              <BancaPicker
+                bancas={bancas}
+                selected={form.banca_ids}
+                onChange={(ids) => setForm({ ...form, banca_ids: ids })}
+              />
+            </div>
+          )}
           {form.role === 'CLIENT_FOLDER' && (
             <div>
               <Label>Carpetas asignadas</Label>

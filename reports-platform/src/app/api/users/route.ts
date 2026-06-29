@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import type { Role } from '@/types';
 
-const VALID_ROLES: Role[] = ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_FOLDER'];
+const VALID_ROLES: Role[] = ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_BANCA', 'CLIENT_FOLDER'];
 
 export async function GET() {
   const session = getSession();
@@ -20,6 +20,7 @@ export async function GET() {
     .order('created_at', { ascending: false });
 
   const { data: perms } = await supabase.from('user_folder_permissions').select('user_id, folder_id');
+  const { data: bperms } = await supabase.from('user_banca_permissions').select('user_id, banca_id');
 
   const byUser = new Map<string, string[]>();
   for (const p of perms || []) {
@@ -28,8 +29,19 @@ export async function GET() {
     byUser.set(p.user_id, arr);
   }
 
+  const bancaByUser = new Map<string, string[]>();
+  for (const p of bperms || []) {
+    const arr = bancaByUser.get(p.user_id) || [];
+    arr.push(p.banca_id);
+    bancaByUser.set(p.user_id, arr);
+  }
+
   return NextResponse.json({
-    users: (users || []).map((u) => ({ ...u, folder_ids: byUser.get(u.id) || [] })),
+    users: (users || []).map((u) => ({
+      ...u,
+      folder_ids: byUser.get(u.id) || [],
+      banca_ids: bancaByUser.get(u.id) || [],
+    })),
   });
 }
 
@@ -39,7 +51,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
-  const { email, full_name, role, temp_password, folder_ids } = await req.json().catch(() => ({}));
+  const { email, full_name, role, temp_password, folder_ids, banca_ids } = await req.json().catch(() => ({}));
   if (!email || !role || !temp_password) {
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 });
   }
@@ -70,6 +82,12 @@ export async function POST(req: NextRequest) {
       .insert(folder_ids.map((fid: string) => ({ user_id: user.id, folder_id: fid })));
   }
 
+  if (role === 'CLIENT_BANCA' && Array.isArray(banca_ids) && banca_ids.length) {
+    await supabase
+      .from('user_banca_permissions')
+      .insert(banca_ids.map((bid: string) => ({ user_id: user.id, banca_id: bid })));
+  }
+
   await logAudit({
     userId: session.userId,
     email: session.email,
@@ -90,7 +108,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
-  const { id, role, is_active, folder_ids } = await req.json().catch(() => ({}));
+  const { id, role, is_active, folder_ids, banca_ids } = await req.json().catch(() => ({}));
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
   const supabase = createServiceClient();
@@ -106,6 +124,15 @@ export async function PATCH(req: NextRequest) {
       await supabase
         .from('user_folder_permissions')
         .insert(folder_ids.map((fid: string) => ({ user_id: id, folder_id: fid })));
+    }
+  }
+
+  if (Array.isArray(banca_ids)) {
+    await supabase.from('user_banca_permissions').delete().eq('user_id', id);
+    if (banca_ids.length) {
+      await supabase
+        .from('user_banca_permissions')
+        .insert(banca_ids.map((bid: string) => ({ user_id: id, banca_id: bid })));
     }
   }
 

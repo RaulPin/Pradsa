@@ -1,4 +1,4 @@
-export type Role = 'SUPER_ADMIN' | 'UPLOADER' | 'CLIENT_FULL' | 'CLIENT_FOLDER';
+export type Role = 'SUPER_ADMIN' | 'UPLOADER' | 'CLIENT_FULL' | 'CLIENT_BANCA' | 'CLIENT_FOLDER';
 
 export type AuditAction =
   | 'LOGIN'
@@ -23,16 +23,26 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface Banca {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface Folder {
   id: string;
   name: string;
   description: string | null;
   region_code: string | null;
+  banca_id: string | null;
   is_active: boolean;
   created_at: string;
 }
 
 export interface FolderWithStats extends Folder {
+  banca_name: string | null;
   report_count: number;
   last_upload: string | null;
   download_count: number;
@@ -73,5 +83,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   SUPER_ADMIN: 'Administrador',
   UPLOADER: 'Cargador',
   CLIENT_FULL: 'Cliente (acceso total)',
+  CLIENT_BANCA: 'Administrativo de Banca',
   CLIENT_FOLDER: 'Cliente (carpeta)',
 };

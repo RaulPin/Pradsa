@@ -14,7 +14,7 @@ create table if not exists public.profiles (
   email text not null unique,
   full_name text,
   password_hash text not null,
-  role text not null check (role in ('SUPER_ADMIN','UPLOADER','CLIENT_FULL','CLIENT_FOLDER')),
+  role text not null check (role in ('SUPER_ADMIN','UPLOADER','CLIENT_FULL','CLIENT_BANCA','CLIENT_FOLDER')),
   must_change_password boolean not null default true,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -40,18 +40,49 @@ create table if not exists public.otp_codes (
 create index if not exists idx_otp_email on public.otp_codes(email);
 
 -- -------------------------------------------------------------
--- Carpetas / regiones (hasta 64+)
+-- Bancas (Banca PyMe, Sucursales, y futuras)
+-- Nivel superior que agrupa las carpetas y aísla los clientes
+-- entre una banca y otra.
+-- -------------------------------------------------------------
+create table if not exists public.bancas (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,        -- PYME, SUCURSALES, ...
+  name text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+insert into public.bancas (code, name)
+values ('PYME', 'Banca PyMe'), ('SUCURSALES', 'Sucursales')
+on conflict (code) do nothing;
+
+-- -------------------------------------------------------------
+-- Carpetas / regiones (hasta 64+ por banca)
 -- -------------------------------------------------------------
 create table if not exists public.folders (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   description text,
   region_code text,
+  banca_id uuid references public.bancas(id),
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_folders_region on public.folders(region_code);
+create index if not exists idx_folders_banca on public.folders(banca_id);
+
+-- -------------------------------------------------------------
+-- Permisos usuario <-> banca (rol Administrativo de Banca)
+-- Ve TODAS las carpetas de su(s) banca(s) automáticamente.
+-- -------------------------------------------------------------
+create table if not exists public.user_banca_permissions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  banca_id uuid references public.bancas(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(user_id, banca_id)
+);
 
 -- -------------------------------------------------------------
 -- Permisos usuario <-> carpeta (para CLIENT_FOLDER)

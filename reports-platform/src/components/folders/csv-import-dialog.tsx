@@ -11,6 +11,7 @@ interface Row {
   name: string;
   description?: string;
   region_code?: string;
+  banca_code?: string;
 }
 
 export function CsvImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
@@ -61,7 +62,8 @@ export function CsvImportDialog({ open, onClose, onDone }: { open: boolean; onCl
         <p className="text-sm text-slate-600">
           El archivo debe tener encabezados: <code className="rounded bg-slate-100 px-1">name</code>,{' '}
           <code className="rounded bg-slate-100 px-1">description</code>,{' '}
-          <code className="rounded bg-slate-100 px-1">region_code</code>.
+          <code className="rounded bg-slate-100 px-1">region_code</code>,{' '}
+          <code className="rounded bg-slate-100 px-1">banca_code</code> (PYME o SUCURSALES).
         </p>
 
         <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 py-8 hover:border-primary">
@@ -83,11 +85,11 @@ export function CsvImportDialog({ open, onClose, onDone }: { open: boolean; onCl
             <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200">
               <Table>
                 <THead>
-                  <TR><TH>Nombre</TH><TH>Región</TH><TH>Descripción</TH></TR>
+                  <TR><TH>Nombre</TH><TH>Banca</TH><TH>Región</TH><TH>Descripción</TH></TR>
                 </THead>
                 <TBody>
                   {rows.slice(0, 50).map((r, i) => (
-                    <TR key={i}><TD>{r.name}</TD><TD>{r.region_code || '—'}</TD><TD>{r.description || '—'}</TD></TR>
+                    <TR key={i}><TD>{r.name}</TD><TD>{r.banca_code || '—'}</TD><TD>{r.region_code || '—'}</TD><TD>{r.description || '—'}</TD></TR>
                   ))}
                 </TBody>
               </Table>

@@ -14,7 +14,10 @@ export function FolderCard({ folder }: { folder: FolderWithStats }) {
           </div>
           {folder.region_code && <Badge tone="slate">{folder.region_code}</Badge>}
         </div>
-        <h3 className="mt-3 font-semibold text-slate-900">{folder.name}</h3>
+        {folder.banca_name && (
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-primary">{folder.banca_name}</p>
+        )}
+        <h3 className={folder.banca_name ? 'font-semibold text-slate-900' : 'mt-3 font-semibold text-slate-900'}>{folder.name}</h3>
         {folder.description && (
           <p className="mt-0.5 line-clamp-1 text-sm text-slate-500">{folder.description}</p>
         )}

@@ -18,6 +18,10 @@ export async function GET() {
   const { data: folders } = await query;
   const list = folders || [];
 
+  // Nombre de banca por id (para mostrar a qué banca pertenece la carpeta)
+  const { data: bancas } = await supabase.from('bancas').select('id, name');
+  const bancaName = new Map((bancas || []).map((b) => [b.id, b.name]));
+
   // Conteo de reportes por carpeta
   const { data: reports } = await supabase
     .from('reports')
@@ -34,6 +38,7 @@ export async function GET() {
 
   const result = list.map((f) => ({
     ...f,
+    banca_name: f.banca_id ? bancaName.get(f.banca_id) || null : null,
     report_count: stats.get(f.id)?.count || 0,
     last_upload: stats.get(f.id)?.last || null,
   }));
@@ -51,6 +56,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const supabase = createServiceClient();
 
+  // Mapa code -> id para resolver la banca por código (útil en importación CSV).
+  const { data: bancas } = await supabase.from('bancas').select('id, code');
+  const bancaByCode = new Map((bancas || []).map((b) => [b.code.toUpperCase(), b.id]));
+
   const rows = Array.isArray(body.folders) ? body.folders : [body];
   const clean = rows
     .filter((r: any) => r && r.name)
@@ -58,6 +67,9 @@ export async function POST(req: NextRequest) {
       name: String(r.name).trim(),
       description: r.description ? String(r.description).trim() : null,
       region_code: r.region_code ? String(r.region_code).trim() : null,
+      banca_id:
+        r.banca_id ||
+        (r.banca_code ? bancaByCode.get(String(r.banca_code).trim().toUpperCase()) || null : null),
     }));
 
   if (clean.length === 0) {
