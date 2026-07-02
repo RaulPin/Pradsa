@@ -8,5 +8,6 @@ export async function POST(req: NextRequest) {
     await logAudit({ userId: session.userId, email: session.email, action: 'LOGOUT', req });
   }
   clearSessionCookie();
-  return NextResponse.redirect(new URL('/login', req.url));
+  // 303 fuerza al navegador a hacer GET en /login (evita el 405 por reenvío del POST).
+  return NextResponse.redirect(new URL('/login', req.url), 303);
 }
