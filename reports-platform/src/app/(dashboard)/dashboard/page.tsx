@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { FolderProgress } from '@/components/dashboard/folder-progress';
 import { ActivityFeed } from '@/components/dashboard/activity-feed';
+import { DonutChart, type DonutSegment } from '@/components/dashboard/donut-chart';
+import { BancaCoverage, type BancaCoverageRow } from '@/components/dashboard/banca-coverage';
+import { bancaColor, NO_BANCA_COLOR } from '@/lib/banca-colors';
 import type { AuditLog, FolderWithStats } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +18,7 @@ export default async function DashboardPage() {
   const isAdmin = session?.role === 'SUPER_ADMIN';
   const supabase = createServiceClient();
 
+  const { data: bancas } = await supabase.from('bancas').select('*').eq('is_active', true).order('name');
   const { data: folders } = await supabase.from('folders').select('*').eq('is_active', true).order('name');
   const { data: reports } = await supabase.from('reports').select('folder_id, uploaded_at').eq('is_active', true);
 
@@ -39,9 +43,40 @@ export default async function DashboardPage() {
   }
   const folderStats: FolderWithStats[] = (folders || []).map((f) => ({
     ...f,
+    banca_name: null,
     report_count: stats.get(f.id)?.count || 0,
     last_upload: stats.get(f.id)?.last || null,
     download_count: 0,
+  }));
+
+  // ----- Datos por banca (dona + cobertura) -----
+  const bancaList = bancas || [];
+  const foldersByBanca = new Map<string | null, { total: number; withReports: number; reports: number }>();
+  for (const f of folders || []) {
+    const key = f.banca_id || null;
+    const agg = foldersByBanca.get(key) || { total: 0, withReports: 0, reports: 0 };
+    const count = stats.get(f.id)?.count || 0;
+    agg.total++;
+    if (count > 0) agg.withReports++;
+    agg.reports += count;
+    foldersByBanca.set(key, agg);
+  }
+
+  const donutData: DonutSegment[] = bancaList.map((b, i) => ({
+    label: b.name,
+    value: foldersByBanca.get(b.id)?.reports || 0,
+    color: bancaColor(b.code, i),
+  }));
+  const noBanca = foldersByBanca.get(null);
+  if (noBanca && noBanca.reports > 0) {
+    donutData.push({ label: 'Sin banca', value: noBanca.reports, color: NO_BANCA_COLOR });
+  }
+
+  const coverageRows: BancaCoverageRow[] = bancaList.map((b, i) => ({
+    name: b.name,
+    color: bancaColor(b.code, i),
+    total: foldersByBanca.get(b.id)?.total || 0,
+    withReports: foldersByBanca.get(b.id)?.withReports || 0,
   }));
 
   const { data: activity } = await supabase
@@ -58,10 +93,27 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard label="Carpetas" value={folders?.length || 0} icon={FolderClosed} tone="blue" />
+        <StatsCard label="Carpetas" value={folders?.length || 0} icon={FolderClosed} tone="blue" hint={`${bancaList.length} banca(s)`} />
         <StatsCard label="Reportes totales" value={reports?.length || 0} icon={FileText} tone="green" />
         <StatsCard label="Descargas este mes" value={downloadsThisMonth || 0} icon={Download} tone="amber" />
         {isAdmin && <StatsCard label="Usuarios" value={userCount || 0} icon={Users} tone="purple" />}
+      </div>
+
+      {/* Gráficas por banca */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Reportes por banca</CardTitle></CardHeader>
+          <CardContent className="py-6">
+            <DonutChart data={donutData} centerLabel="reportes" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Cobertura de regiones</CardTitle></CardHeader>
+          <CardContent className="py-6">
+            <BancaCoverage rows={coverageRows} />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
