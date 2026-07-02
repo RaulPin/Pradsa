@@ -407,7 +407,13 @@ export function UserManager() {
           }`}
         >
           <span>{notice.text}</span>
-          <button onClick={() => setNotice(null)} className="text-current opacity-60 hover:opacity-100">✕</button>
+          <button
+            onClick={() => setNotice(null)}
+            aria-label="Cerrar aviso"
+            className="text-current opacity-60 hover:opacity-100"
+          >
+            <span aria-hidden>✕</span>
+          </button>
         </div>
       )}
 
@@ -565,6 +571,8 @@ export function UserManager() {
               <Button
                 type="button"
                 variant="outline"
+                aria-label="Generar otra contraseña"
+                title="Generar otra contraseña"
                 onClick={() => setForm({ ...form, temp_password: randomPassword() })}
               >
                 <RefreshCw size={15} />

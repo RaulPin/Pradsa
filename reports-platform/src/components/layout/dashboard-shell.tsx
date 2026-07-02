@@ -1,35 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import type { Role } from '@/types';
 
-const STORAGE_KEY = 'pradsa_sidebar_collapsed';
+const COOKIE = 'pradsa_sidebar_collapsed';
 
 export function DashboardShell({
   email,
   role,
+  initialCollapsed,
   children,
 }: {
   email: string;
   role: Role;
+  initialCollapsed: boolean;
   children: React.ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // El valor inicial viene del servidor (cookie), así el primer render
+  // ya coincide con la preferencia del usuario: sin parpadeo.
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Restaura el estado colapsado guardado (solo escritorio).
-  useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) === '1') {
-      setCollapsed(true);
-    }
-  }, []);
 
   function toggleCollapse() {
     setCollapsed((c) => {
       const next = !c;
-      try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0'); } catch {}
+      try {
+        document.cookie = `${COOKIE}=${next ? '1' : '0'}; path=/; max-age=31536000; samesite=lax`;
+      } catch {}
       return next;
     });
   }

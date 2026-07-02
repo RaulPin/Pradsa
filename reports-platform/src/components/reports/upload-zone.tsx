@@ -153,7 +153,12 @@ export function UploadZone() {
                     <p className="text-xs text-slate-500">{formatBytes(item.file.size)}</p>
                   </div>
                   {item.status === 'pending' && (
-                    <button onClick={() => removeItem(idx)} className="text-slate-400 hover:text-red-600">
+                    <button
+                      onClick={() => removeItem(idx)}
+                      aria-label={`Quitar ${item.file.name}`}
+                      title="Quitar archivo"
+                      className="rounded text-slate-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                    >
                       <Trash2 size={16} />
                     </button>
                   )}
