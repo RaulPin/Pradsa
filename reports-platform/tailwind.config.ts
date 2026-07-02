@@ -9,13 +9,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        sidebar: '#1e293b',
-        sidebarHover: '#334155',
-        primary: {
-          DEFAULT: '#2563eb',
-          dark: '#1d4ed8',
-          light: '#3b82f6',
+        // Sistema visual "corporativo bancario"
+        sidebar: '#0e1f3a',       // azul marino profundo
+        sidebarHover: '#16294a',
+        navy: {
+          DEFAULT: '#0e1f3a',
+          soft: '#1d335a',
         },
+        primary: {
+          DEFAULT: '#9b1c31',     // vino / carmesí (acento de marca)
+          dark: '#7e1728',
+          light: '#b23a4e',
+        },
+        gold: {
+          DEFAULT: '#b0873c',     // dorado metálico (uso moderado)
+          soft: '#c9a35f',
+        },
+      },
+      fontFamily: {
+        display: ['Georgia', '"Times New Roman"', 'serif'],
       },
     },
   },

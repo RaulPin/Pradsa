@@ -1,36 +1,43 @@
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+
+type Tone = 'crimson' | 'navy' | 'gold' | 'green';
+
+const accents: Record<Tone, string> = {
+  crimson: 'bg-primary',
+  navy: 'bg-navy',
+  gold: 'bg-gold',
+  green: 'bg-green-600',
+};
+
+const iconTones: Record<Tone, string> = {
+  crimson: 'text-primary',
+  navy: 'text-navy',
+  gold: 'text-gold',
+  green: 'text-green-600',
+};
 
 export function StatsCard({
   label,
   value,
   icon: Icon,
-  tone = 'blue',
+  tone = 'crimson',
   hint,
 }: {
   label: string;
   value: string | number;
   icon: React.ElementType;
-  tone?: 'blue' | 'green' | 'amber' | 'purple';
+  tone?: Tone;
   hint?: string;
 }) {
-  const tones = {
-    blue: 'bg-blue-50 text-primary ring-blue-100',
-    green: 'bg-green-50 text-green-600 ring-green-100',
-    amber: 'bg-amber-50 text-amber-600 ring-amber-100',
-    purple: 'bg-purple-50 text-purple-600 ring-purple-100',
-  };
   return (
-    <Card className="transition-shadow hover:shadow-md">
-      <CardContent className="flex items-center gap-4 py-5">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ring-4 ${tones[tone]}`}>
-          <Icon size={22} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-2xl font-semibold leading-tight text-slate-900">{value}</p>
-          <p className="truncate text-sm text-slate-500">{label}</p>
-          {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
-        </div>
-      </CardContent>
+    <Card className="relative overflow-hidden p-5 transition-shadow hover:shadow-md">
+      <span className={`absolute left-0 top-5 h-7 w-[3px] rounded-full ${accents[tone]}`} />
+      <div className="flex items-start justify-between">
+        <div className="eyebrow">{label}</div>
+        <Icon size={18} className={iconTones[tone]} />
+      </div>
+      <p className="mt-2 text-3xl font-semibold tabular-nums leading-none text-slate-900">{value}</p>
+      {hint && <p className="mt-2 text-xs text-slate-400">{hint}</p>}
     </Card>
   );
 }

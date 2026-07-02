@@ -87,16 +87,19 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Visión general del flujo de trabajo</p>
+      <div className="flex items-end justify-between border-b-2 border-navy pb-3">
+        <div>
+          <div className="eyebrow">Visión general</div>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">Panel de control</h1>
+        </div>
+        <p className="hidden text-sm text-slate-500 sm:block">Flujo de trabajo de Contraloría</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard label="Carpetas" value={folders?.length || 0} icon={FolderClosed} tone="blue" hint={`${bancaList.length} banca(s)`} />
-        <StatsCard label="Reportes totales" value={reports?.length || 0} icon={FileText} tone="green" />
-        <StatsCard label="Descargas este mes" value={downloadsThisMonth || 0} icon={Download} tone="amber" />
-        {isAdmin && <StatsCard label="Usuarios" value={userCount || 0} icon={Users} tone="purple" />}
+        <StatsCard label="Carpetas" value={folders?.length || 0} icon={FolderClosed} tone="crimson" hint={`${bancaList.length} banca(s)`} />
+        <StatsCard label="Reportes totales" value={reports?.length || 0} icon={FileText} tone="navy" />
+        <StatsCard label="Descargas este mes" value={downloadsThisMonth || 0} icon={Download} tone="gold" />
+        {isAdmin && <StatsCard label="Usuarios" value={userCount || 0} icon={Users} tone="green" />}
       </div>
 
       {/* Gráficas por banca */}

@@ -34,13 +34,13 @@ export default async function FolderDetailPage({ params }: { params: { folderId:
       </Link>
 
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-primary">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-navy">
           <FolderClosed size={24} />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-slate-900">{folder.name}</h1>
-            {folder.region_code && <Badge tone="blue">{folder.region_code}</Badge>}
+            <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{folder.name}</h1>
+            {folder.region_code && <Badge tone="slate">{folder.region_code}</Badge>}
           </div>
           {folder.description && <p className="text-sm text-slate-500">{folder.description}</p>}
         </div>

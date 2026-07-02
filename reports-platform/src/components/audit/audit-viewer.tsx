@@ -22,12 +22,13 @@ const ACTION_LABELS: Record<string, string> = {
   OTP_REQUESTED: 'OTP solicitado',
   OTP_VERIFIED: 'OTP verificado',
   PASSWORD_CHANGED: 'Cambio de contraseña',
+  PASSWORD_RESET: 'Reseteo de contraseña',
   USER_CREATED: 'Usuario creado',
   FOLDER_CREATED: 'Carpeta creada',
 };
 
 const ACTION_TONE: Record<string, 'green' | 'red' | 'blue' | 'amber' | 'slate'> = {
-  LOGIN: 'green', DOWNLOAD: 'blue', UPLOAD: 'amber', LOGIN_FAILED: 'red',
+  LOGIN: 'green', DOWNLOAD: 'blue', UPLOAD: 'amber', LOGIN_FAILED: 'red', PASSWORD_RESET: 'amber',
 };
 
 export function AuditViewer() {
@@ -73,7 +74,8 @@ export function AuditViewer() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Auditoría</h1>
+          <div className="eyebrow">Trazabilidad</div>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">Auditoría</h1>
           <p className="text-sm text-slate-500">Registro de logins, descargas y cargas</p>
         </div>
         <Button variant="outline" onClick={exportCsv} disabled={!logs.length}>

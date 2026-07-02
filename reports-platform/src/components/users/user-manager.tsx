@@ -362,7 +362,8 @@ export function UserManager() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Usuarios</h1>
+          <div className="eyebrow">Administración</div>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">Usuarios</h1>
           <p className="text-sm text-slate-500">{users.length} usuarios registrados</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}><Plus size={16} /> Nuevo usuario</Button>

@@ -9,13 +9,13 @@ export function FolderCard({ folder }: { folder: FolderWithStats }) {
     <Link href={`/folders/${folder.id}`}>
       <Card className="p-5 transition-shadow hover:shadow-md">
         <div className="flex items-start justify-between">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-primary">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-navy">
             <FolderClosed size={22} />
           </div>
           {folder.region_code && <Badge tone="slate">{folder.region_code}</Badge>}
         </div>
         {folder.banca_name && (
-          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-primary">{folder.banca_name}</p>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-primary">{folder.banca_name}</p>
         )}
         <h3 className={folder.banca_name ? 'font-semibold text-slate-900' : 'mt-3 font-semibold text-slate-900'}>{folder.name}</h3>
         {folder.description && (

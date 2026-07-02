@@ -58,7 +58,8 @@ export function FolderList({ role }: { role: Role }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Carpetas</h1>
+          <div className="eyebrow">Documentos</div>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">Carpetas</h1>
           <p className="text-sm text-slate-500">{folders.length} carpetas / regiones</p>
         </div>
         {isAdmin && (
