@@ -12,4 +12,5 @@ export function formatBytes(bytes: number | null): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
-export const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4 MB
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_FILE_SIZE_LABEL = '10 MB';

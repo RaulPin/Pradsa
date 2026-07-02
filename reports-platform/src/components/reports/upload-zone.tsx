@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatBytes, MAX_FILE_SIZE } from '@/lib/utils';
+import { formatBytes, MAX_FILE_SIZE, MAX_FILE_SIZE_LABEL } from '@/lib/utils';
+import { createBrowserClient } from '@/lib/supabase/browser';
 import type { Folder } from '@/types';
 
 type Status = 'pending' | 'uploading' | 'done' | 'error';
@@ -34,7 +35,7 @@ export function UploadZone() {
       let status: Status = 'pending';
       let error: string | undefined;
       if (file.type !== 'application/pdf') { status = 'error'; error = 'No es un PDF'; }
-      else if (file.size > MAX_FILE_SIZE) { status = 'error'; error = 'Excede 4 MB'; }
+      else if (file.size > MAX_FILE_SIZE) { status = 'error'; error = `Excede ${MAX_FILE_SIZE_LABEL}`; }
       return { file, status, error };
     });
     setQueue((q) => [...q, ...items]);
@@ -50,38 +51,50 @@ export function UploadZone() {
     setQueue((q) => q.filter((_, i) => i !== idx));
   }
 
+  function setItemStatus(file: File, status: Status, error?: string) {
+    setQueue((q) => q.map((i) => (i.file === file ? { ...i, status, error } : i)));
+  }
+
   async function uploadAll() {
     if (!folderId) { alert('Selecciona una carpeta de destino'); return; }
     const valid = queue.filter((i) => i.status === 'pending');
     if (!valid.length) return;
 
     setUploading(true);
-    const form = new FormData();
-    form.append('folderId', folderId);
-    valid.forEach((i) => form.append('files', i.file));
-
+    const supabase = createBrowserClient();
     setQueue((q) => q.map((i) => (i.status === 'pending' ? { ...i, status: 'uploading' } : i)));
 
-    try {
-      const res = await fetch('/api/reports/upload', { method: 'POST', body: form });
-      const data = await res.json();
-      const resultMap = new Map<string, { ok: boolean; error?: string }>(
-        (data.results || []).map((r: any) => [r.name, r])
-      );
-      setQueue((q) =>
-        q.map((i) => {
-          if (i.status !== 'uploading') return i;
-          const r = resultMap.get(i.file.name);
-          return r?.ok
-            ? { ...i, status: 'done' as Status }
-            : { ...i, status: 'error' as Status, error: r?.error || 'Error al subir' };
-        })
-      );
-    } catch {
-      setQueue((q) => q.map((i) => (i.status === 'uploading' ? { ...i, status: 'error', error: 'Error de red' } : i)));
-    } finally {
-      setUploading(false);
+    // Cada archivo: pedir URL firmada → subir directo a Supabase → confirmar en la base.
+    for (const item of valid) {
+      try {
+        const urlRes = await fetch('/api/reports/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderId, fileName: item.file.name, fileSize: item.file.size }),
+        });
+        const urlData = await urlRes.json();
+        if (!urlRes.ok) throw new Error(urlData.error || 'No se pudo preparar la carga');
+
+        const { error: upErr } = await supabase.storage
+          .from('reports')
+          .uploadToSignedUrl(urlData.path, urlData.token, item.file, { contentType: 'application/pdf' });
+        if (upErr) throw new Error(upErr.message);
+
+        const confRes = await fetch('/api/reports/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderId, fileName: item.file.name, filePath: urlData.path, fileSize: item.file.size }),
+        });
+        const confData = await confRes.json();
+        if (!confRes.ok) throw new Error(confData.error || 'No se pudo registrar');
+
+        setItemStatus(item.file, 'done');
+      } catch (e) {
+        setItemStatus(item.file, 'error', e instanceof Error ? e.message : 'Error al subir');
+      }
     }
+
+    setUploading(false);
   }
 
   const pendingCount = queue.filter((i) => i.status === 'pending').length;
@@ -106,7 +119,7 @@ export function UploadZone() {
           <div
             {...getRootProps()}
             className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 transition-colors ${
-              isDragActive ? 'border-primary bg-blue-50' : 'border-slate-300 hover:border-primary'
+              isDragActive ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary'
             }`}
           >
             <input {...getInputProps()} />
@@ -114,7 +127,7 @@ export function UploadZone() {
             <p className="mt-2 font-medium text-slate-700">
               Arrastra tus PDF aquí o haz clic para seleccionar
             </p>
-            <p className="text-sm text-slate-500">Varios archivos a la vez · máximo 4 MB cada uno</p>
+            <p className="text-sm text-slate-500">Varios archivos a la vez · máximo {MAX_FILE_SIZE_LABEL} cada uno</p>
           </div>
         </CardContent>
       </Card>
