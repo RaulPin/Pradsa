@@ -9,6 +9,7 @@ export type AuditAction =
   | 'OTP_REQUESTED'
   | 'OTP_VERIFIED'
   | 'PASSWORD_CHANGED'
+  | 'PASSWORD_RESET'
   | 'USER_CREATED'
   | 'FOLDER_CREATED';
 

@@ -164,6 +164,27 @@ function EditUserDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Reseteo de contraseña (iniciado por el administrador)
+  const [resetPwd, setResetPwd] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+
+  async function resetPassword() {
+    if (!resetPwd) return;
+    setResetting(true);
+    setError('');
+    const res = await fetch('/api/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: user.id, temp_password: resetPwd }),
+    });
+    const data = await res.json();
+    setResetting(false);
+    if (!res.ok) { setError(data.error || 'Error al resetear'); return; }
+    setResetDone(true);
+    onDone();
+  }
+
   async function save() {
     setSaving(true);
     setError('');
@@ -232,6 +253,49 @@ function EditUserDialog({
             <option value="active">Activo</option>
             <option value="inactive">Inactivo</option>
           </Select>
+        </div>
+
+        {/* Reseteo de contraseña */}
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <Label>Reseteo de contraseña</Label>
+          {!resetDone ? (
+            <>
+              <p className="mb-2 text-xs text-slate-500">
+                Genera una contraseña temporal. El usuario deberá cambiarla en su próximo ingreso.
+              </p>
+              {resetPwd ? (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input value={resetPwd} readOnly className="font-mono" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setResetPwd(randomPassword())}
+                      title="Generar otra"
+                    >
+                      <RefreshCw size={15} />
+                    </Button>
+                  </div>
+                  <Button type="button" onClick={resetPassword} disabled={resetting}>
+                    {resetting && <Loader2 className="animate-spin" size={16} />}
+                    Aplicar reseteo
+                  </Button>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setResetPwd(randomPassword())}>
+                  Generar contraseña temporal
+                </Button>
+              )}
+            </>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-green-700">✓ Contraseña reseteada.</p>
+              <p className="text-xs text-slate-600">
+                Comparte esta contraseña temporal con el usuario:
+              </p>
+              <Input value={resetPwd || ''} readOnly className="font-mono" />
+            </div>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

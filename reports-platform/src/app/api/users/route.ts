@@ -108,7 +108,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
-  const { id, role, is_active, folder_ids, banca_ids } = await req.json().catch(() => ({}));
+  const { id, role, is_active, folder_ids, banca_ids, temp_password } = await req.json().catch(() => ({}));
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
   const supabase = createServiceClient();
@@ -116,7 +116,25 @@ export async function PATCH(req: NextRequest) {
   if (role && VALID_ROLES.includes(role)) updates.role = role;
   if (typeof is_active === 'boolean') updates.is_active = is_active;
 
+  // Reseteo de contraseña iniciado por el administrador:
+  // se asigna una temporal y se obliga a cambiarla en el próximo ingreso.
+  if (typeof temp_password === 'string' && temp_password.length >= 8) {
+    updates.password_hash = await bcrypt.hash(temp_password, 12);
+    updates.must_change_password = true;
+  }
+
   await supabase.from('profiles').update(updates).eq('id', id);
+
+  if (updates.password_hash) {
+    await logAudit({
+      userId: session.userId,
+      email: session.email,
+      action: 'PASSWORD_RESET',
+      resourceType: 'USER',
+      resourceId: id,
+      req,
+    });
+  }
 
   if (Array.isArray(folder_ids)) {
     await supabase.from('user_folder_permissions').delete().eq('user_id', id);
