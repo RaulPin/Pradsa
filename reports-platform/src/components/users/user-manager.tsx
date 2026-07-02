@@ -388,7 +388,7 @@ export function UserManager() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="eyebrow">Administración</div>
           <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">Usuarios</h1>
