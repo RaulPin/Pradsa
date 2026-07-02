@@ -23,7 +23,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'CLIENT_FULL'] },
-  { href: '/folders', label: 'Carpetas', icon: FolderClosed, roles: ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_FOLDER'] },
+  { href: '/folders', label: 'Carpetas', icon: FolderClosed, roles: ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_BANCA', 'CLIENT_FOLDER'] },
   { href: '/upload', label: 'Cargar reportes', icon: Upload, roles: ['SUPER_ADMIN', 'UPLOADER'] },
   { href: '/users', label: 'Usuarios', icon: Users, roles: ['SUPER_ADMIN'] },
   { href: '/audit', label: 'Auditoría', icon: ScrollText, roles: ['SUPER_ADMIN'] },

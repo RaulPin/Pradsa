@@ -8,7 +8,7 @@ const MAX_ATTEMPTS = 5;
 
 function landingFor(role: Role): string {
   if (role === 'UPLOADER') return '/upload';
-  if (role === 'CLIENT_FOLDER') return '/folders';
+  if (role === 'CLIENT_FOLDER' || role === 'CLIENT_BANCA') return '/folders';
   return '/dashboard';
 }
 

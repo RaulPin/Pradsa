@@ -54,7 +54,7 @@ export const ROLE_ROUTES: Record<string, Role[]> = {
   '/upload': ['SUPER_ADMIN', 'UPLOADER'],
   '/users': ['SUPER_ADMIN'],
   '/audit': ['SUPER_ADMIN'],
-  '/folders': ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_FOLDER'],
+  '/folders': ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_BANCA', 'CLIENT_FOLDER'],
 };
 
 export function canAccess(role: Role, path: string): boolean {
@@ -65,6 +65,6 @@ export function canAccess(role: Role, path: string): boolean {
 
 export function landingFor(role: Role): string {
   if (role === 'UPLOADER') return '/upload';
-  if (role === 'CLIENT_FOLDER') return '/folders';
+  if (role === 'CLIENT_FOLDER' || role === 'CLIENT_BANCA') return '/folders';
   return '/dashboard';
 }
