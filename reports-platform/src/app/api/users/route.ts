@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { sendWelcomeEmail } from '@/lib/email';
 import type { Role } from '@/types';
 
 const VALID_ROLES: Role[] = ['SUPER_ADMIN', 'UPLOADER', 'CLIENT_FULL', 'CLIENT_BANCA', 'CLIENT_FOLDER'];
@@ -98,7 +99,11 @@ export async function POST(req: NextRequest) {
     req,
   });
 
-  return NextResponse.json({ user });
+  // Correo de bienvenida con credenciales y link de la app.
+  const appUrl = process.env.APP_URL || new URL(req.url).origin;
+  const emailSent = await sendWelcomeEmail(String(email).toLowerCase(), temp_password, appUrl);
+
+  return NextResponse.json({ user, emailSent });
 }
 
 // PATCH: actualizar rol, estado o permisos de carpetas.

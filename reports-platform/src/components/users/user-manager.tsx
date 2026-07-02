@@ -322,6 +322,7 @@ export function UserManager() {
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [form, setForm] = useState({
     email: '', full_name: '', role: 'CLIENT_FULL' as Role,
     temp_password: randomPassword(), folder_ids: [] as string[], banca_ids: [] as string[],
@@ -353,8 +354,14 @@ export function UserManager() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Error al crear usuario'); return; }
+    const createdEmail = form.email;
     setCreateOpen(false);
     setForm({ email: '', full_name: '', role: 'CLIENT_FULL', temp_password: randomPassword(), folder_ids: [], banca_ids: [] });
+    setNotice(
+      data.emailSent
+        ? { ok: true, text: `Usuario creado. Se envió el correo con las credenciales a ${createdEmail}.` }
+        : { ok: false, text: `Usuario creado, pero el correo no pudo enviarse. Comparte la contraseña manualmente con ${createdEmail}.` }
+    );
     load();
   }
 
@@ -368,6 +375,17 @@ export function UserManager() {
         </div>
         <Button onClick={() => setCreateOpen(true)}><Plus size={16} /> Nuevo usuario</Button>
       </div>
+
+      {notice && (
+        <div
+          className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${
+            notice.ok ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}
+        >
+          <span>{notice.text}</span>
+          <button onClick={() => setNotice(null)} className="text-current opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-20 text-slate-400"><Loader2 className="animate-spin" /></div>
@@ -495,7 +513,9 @@ export function UserManager() {
                 <RefreshCw size={15} />
               </Button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">El usuario deberá cambiarla en su primer ingreso.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Se enviará automáticamente al correo del usuario junto con el link de acceso. Deberá cambiarla en su primer ingreso.
+            </p>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
