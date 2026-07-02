@@ -20,8 +20,23 @@ export function FolderList({ role }: { role: Role }) {
   const [newOpen, setNewOpen] = useState(false);
   const [form, setForm] = useState({ name: '', region_code: '', description: '', banca_id: '' });
   const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<FolderWithStats | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const isAdmin = role === 'SUPER_ADMIN';
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    setDeleting(true);
+    setDeleteError('');
+    const res = await fetch(`/api/folders/${toDelete.id}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    setDeleting(false);
+    if (!res.ok) { setDeleteError(data.error || 'No se pudo borrar la carpeta'); return; }
+    setToDelete(null);
+    load();
+  }
 
   async function load() {
     setLoading(true);
@@ -85,11 +100,39 @@ export function FolderList({ role }: { role: Role }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((f) => <FolderCard key={f.id} folder={f} />)}
+          {filtered.map((f) => (
+            <FolderCard
+              key={f.id}
+              folder={f}
+              onDelete={isAdmin ? (folder) => { setDeleteError(''); setToDelete(folder); } : undefined}
+            />
+          ))}
         </div>
       )}
 
       <CsvImportDialog open={csvOpen} onClose={() => setCsvOpen(false)} onDone={load} />
+
+      {/* Confirmación de borrado */}
+      <Dialog open={!!toDelete} onClose={() => setToDelete(null)} title="Eliminar carpeta">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            ¿Seguro que deseas eliminar la carpeta{' '}
+            <span className="font-semibold text-slate-900">{toDelete?.name}</span>? Esta acción no se puede deshacer.
+          </p>
+          {(toDelete?.report_count ?? 0) > 0 && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Esta carpeta tiene {toDelete?.report_count} reporte(s). Deberás eliminarlos antes de poder borrarla.
+            </p>
+          )}
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setToDelete(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={confirmDelete} disabled={deleting}>
+              {deleting && <Loader2 className="animate-spin" size={16} />} Eliminar
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       <Dialog open={newOpen} onClose={() => setNewOpen(false)} title="Nueva carpeta">
         <div className="space-y-3">

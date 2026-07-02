@@ -25,6 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
   PASSWORD_RESET: 'Reseteo de contraseña',
   USER_CREATED: 'Usuario creado',
   FOLDER_CREATED: 'Carpeta creada',
+  FOLDER_DELETED: 'Carpeta eliminada',
 };
 
 const ACTION_TONE: Record<string, 'green' | 'red' | 'blue' | 'amber' | 'slate'> = {

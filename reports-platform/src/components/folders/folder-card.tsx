@@ -1,13 +1,33 @@
 import Link from 'next/link';
-import { FolderClosed, FileText } from 'lucide-react';
+import { FolderClosed, FileText, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { FolderWithStats } from '@/types';
 
-export function FolderCard({ folder }: { folder: FolderWithStats }) {
+export function FolderCard({
+  folder,
+  onDelete,
+}: {
+  folder: FolderWithStats;
+  onDelete?: (folder: FolderWithStats) => void;
+}) {
   return (
     <Link href={`/folders/${folder.id}`}>
-      <Card className="p-5 transition-shadow hover:shadow-md">
+      <Card className="relative p-5 transition-shadow hover:shadow-md">
+        {onDelete && (
+          <button
+            type="button"
+            title="Eliminar carpeta"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(folder);
+            }}
+            className="absolute right-2 top-2 rounded-md p-1.5 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
         <div className="flex items-start justify-between">
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-navy">
             <FolderClosed size={22} />

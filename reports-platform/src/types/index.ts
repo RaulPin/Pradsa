@@ -11,7 +11,8 @@ export type AuditAction =
   | 'PASSWORD_CHANGED'
   | 'PASSWORD_RESET'
   | 'USER_CREATED'
-  | 'FOLDER_CREATED';
+  | 'FOLDER_CREATED'
+  | 'FOLDER_DELETED';
 
 export interface Profile {
   id: string;
