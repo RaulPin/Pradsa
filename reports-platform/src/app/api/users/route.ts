@@ -161,3 +161,39 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
+
+// DELETE: eliminar un usuario. Solo el administrador general.
+export async function DELETE(req: NextRequest) {
+  const session = getSession();
+  if (!session || session.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
+
+  const { id } = await req.json().catch(() => ({}));
+  if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
+  if (id === session.userId) {
+    return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta.' }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+  const { data: target } = await supabase.from('profiles').select('email').eq('id', id).maybeSingle();
+  if (!target) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+
+  // Conserva los reportes que haya subido (desvincula al autor antes de borrar).
+  await supabase.from('reports').update({ uploaded_by: null }).eq('uploaded_by', id);
+
+  const { error } = await supabase.from('profiles').delete().eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await logAudit({
+    userId: session.userId,
+    email: session.email,
+    action: 'USER_DELETED',
+    resourceType: 'USER',
+    resourceId: id,
+    metadata: { email: target.email },
+    req,
+  });
+
+  return NextResponse.json({ ok: true });
+}

@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   PASSWORD_CHANGED: 'Cambio de contraseña',
   PASSWORD_RESET: 'Reseteo de contraseña',
   USER_CREATED: 'Usuario creado',
+  USER_DELETED: 'Usuario eliminado',
   FOLDER_CREATED: 'Carpeta creada',
   FOLDER_DELETED: 'Carpeta eliminada',
 };

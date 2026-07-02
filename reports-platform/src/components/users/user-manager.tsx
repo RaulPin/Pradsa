@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Loader2, RefreshCw, Pencil } from 'lucide-react';
+import { Plus, Loader2, RefreshCw, Pencil, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { UserCsvImport } from './user-csv-import';
 import { ROLE_LABELS, type Banca, type Folder, type Role } from '@/types';
 
 interface UserRow {
@@ -323,6 +324,26 @@ export function UserManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [toDeleteUser, setToDeleteUser] = useState<UserRow | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [deleteUserError, setDeleteUserError] = useState('');
+
+  async function confirmDeleteUser() {
+    if (!toDeleteUser) return;
+    setDeletingUser(true);
+    setDeleteUserError('');
+    const res = await fetch('/api/users', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: toDeleteUser.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setDeletingUser(false);
+    if (!res.ok) { setDeleteUserError(data.error || 'No se pudo eliminar'); return; }
+    setToDeleteUser(null);
+    load();
+  }
   const [form, setForm] = useState({
     email: '', full_name: '', role: 'CLIENT_FULL' as Role,
     temp_password: randomPassword(), folder_ids: [] as string[], banca_ids: [] as string[],
@@ -373,7 +394,10 @@ export function UserManager() {
           <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">Usuarios</h1>
           <p className="text-sm text-slate-500">{users.length} usuarios registrados</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}><Plus size={16} /> Nuevo usuario</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload size={16} /> Importar CSV</Button>
+          <Button onClick={() => setCreateOpen(true)}><Plus size={16} /> Nuevo usuario</Button>
+        </div>
       </div>
 
       {notice && (
@@ -424,13 +448,20 @@ export function UserManager() {
                       : <Badge tone="red">Inactivo</Badge>}
                   </TD>
                   <TD className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditUser(u)}
-                    >
-                      <Pencil size={14} /> Editar
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>
+                        <Pencil size={14} /> Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 hover:bg-red-50"
+                        title="Eliminar usuario"
+                        onClick={() => { setDeleteUserError(''); setToDeleteUser(u); }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
                   </TD>
                 </TR>
               ))}
@@ -456,6 +487,32 @@ export function UserManager() {
           onDone={load}
         />
       )}
+
+      {/* Importación masiva por CSV */}
+      <UserCsvImport
+        open={csvOpen}
+        onClose={() => setCsvOpen(false)}
+        onDone={load}
+        folders={folders}
+        bancas={bancas}
+      />
+
+      {/* Confirmación de borrado de usuario */}
+      <Dialog open={!!toDeleteUser} onClose={() => setToDeleteUser(null)} title="Eliminar usuario">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            ¿Seguro que deseas eliminar a{' '}
+            <span className="font-semibold text-slate-900">{toDeleteUser?.email}</span>? Esta acción no se puede deshacer.
+          </p>
+          {deleteUserError && <p className="text-sm text-red-600">{deleteUserError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setToDeleteUser(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={confirmDeleteUser} disabled={deletingUser}>
+              {deletingUser && <Loader2 className="animate-spin" size={16} />} Eliminar
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* Diálogo de creación */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Nuevo usuario">

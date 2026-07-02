@@ -11,6 +11,7 @@ export type AuditAction =
   | 'PASSWORD_CHANGED'
   | 'PASSWORD_RESET'
   | 'USER_CREATED'
+  | 'USER_DELETED'
   | 'FOLDER_CREATED'
   | 'FOLDER_DELETED';
 
