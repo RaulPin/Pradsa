@@ -6,6 +6,8 @@ export type AuditAction =
   | 'LOGIN_FAILED'
   | 'DOWNLOAD'
   | 'UPLOAD'
+  | 'REPORT_DELETED'
+  | 'REPORT_RECEIVED'
   | 'OTP_REQUESTED'
   | 'OTP_VERIFIED'
   | 'PASSWORD_CHANGED'

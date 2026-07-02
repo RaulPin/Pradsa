@@ -27,6 +27,29 @@ export default async function FolderDetailPage({ params }: { params: { folderId:
     .eq('is_active', true)
     .order('uploaded_at', { ascending: false });
 
+  const reportList = (reports || []) as Report[];
+  const reportIds = reportList.map((r) => r.id);
+
+  // Acuses de recibo de estos reportes.
+  const { data: receipts } = reportIds.length
+    ? await supabase.from('report_receipts').select('report_id, user_id, created_at').in('report_id', reportIds)
+    : { data: [] as { report_id: string; user_id: string; created_at: string }[] };
+
+  const isStaff = session.role === 'SUPER_ADMIN' || session.role === 'UPLOADER';
+
+  // Nombres de quienes confirmaron (solo se muestran al personal).
+  const receiverIds = Array.from(new Set((receipts || []).map((r) => r.user_id)));
+  const { data: receivers } = isStaff && receiverIds.length
+    ? await supabase.from('profiles').select('id, email, full_name').in('id', receiverIds)
+    : { data: [] as { id: string; email: string; full_name: string | null }[] };
+  const nameById = new Map((receivers || []).map((p) => [p.id, p.full_name || p.email]));
+
+  const receivedByMe = (receipts || []).filter((r) => r.user_id === session.userId).map((r) => r.report_id);
+  const receiptsByReport: Record<string, string[]> = {};
+  for (const r of receipts || []) {
+    (receiptsByReport[r.report_id] ||= []).push(nameById.get(r.user_id) || 'Usuario');
+  }
+
   return (
     <div className="space-y-5">
       <Link href="/folders" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
@@ -47,9 +70,14 @@ export default async function FolderDetailPage({ params }: { params: { folderId:
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Reportes ({(reports || []).length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Reportes ({reportList.length})</CardTitle></CardHeader>
         <CardContent className="p-0">
-          <ReportTable reports={(reports || []) as Report[]} />
+          <ReportTable
+            reports={reportList}
+            role={session.role}
+            receivedIds={receivedByMe}
+            receiptsByReport={isStaff ? receiptsByReport : undefined}
+          />
         </CardContent>
       </Card>
     </div>

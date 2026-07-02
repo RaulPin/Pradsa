@@ -19,6 +19,8 @@ const ACTION_LABELS: Record<string, string> = {
   LOGIN_FAILED: 'Acceso fallido',
   DOWNLOAD: 'Descarga',
   UPLOAD: 'Carga',
+  REPORT_DELETED: 'Reporte eliminado',
+  REPORT_RECEIVED: 'Acuse de recibo',
   OTP_REQUESTED: 'OTP solicitado',
   OTP_VERIFIED: 'OTP verificado',
   PASSWORD_CHANGED: 'Cambio de contraseña',
@@ -31,6 +33,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 const ACTION_TONE: Record<string, 'green' | 'red' | 'blue' | 'amber' | 'slate'> = {
   LOGIN: 'green', DOWNLOAD: 'blue', UPLOAD: 'amber', LOGIN_FAILED: 'red', PASSWORD_RESET: 'amber',
+  REPORT_RECEIVED: 'green', REPORT_DELETED: 'red',
 };
 
 export function AuditViewer() {
