@@ -30,22 +30,25 @@ export function UploadZone() {
       .then((d) => setFolders(d.folders || []));
   }, []);
 
-  const onDrop = useCallback((accepted: File[]) => {
-    const items: QueueItem[] = accepted.map((file) => {
+  // Recibe todos los archivos (aceptados y rechazados por el dropzone) para
+  // que SIEMPRE entren a la lista con un motivo visible, en vez de rechazarse
+  // en silencio.
+  const onDrop = useCallback((accepted: File[], rejected: { file: File }[]) => {
+    const all = [...accepted, ...rejected.map((r) => r.file)];
+    const items: QueueItem[] = all.map((file) => {
+      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
       let status: Status = 'pending';
       let error: string | undefined;
-      if (file.type !== 'application/pdf') { status = 'error'; error = 'No es un PDF'; }
-      else if (file.size > MAX_FILE_SIZE) { status = 'error'; error = `Excede ${MAX_FILE_SIZE_LABEL}`; }
+      if (!isPdf) { status = 'error'; error = 'No es un PDF'; }
+      else if (file.size > MAX_FILE_SIZE) { status = 'error'; error = `Excede ${MAX_FILE_SIZE_LABEL} (${formatBytes(file.size)})`; }
       return { file, status, error };
     });
     setQueue((q) => [...q, ...items]);
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'application/pdf': ['.pdf'] },
-    maxSize: MAX_FILE_SIZE,
-  });
+  // Sin filtros de accept/maxSize en el dropzone: validamos en onDrop y
+  // mostramos el motivo. Así nunca hay un rechazo mudo.
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   function removeItem(idx: number) {
     setQueue((q) => q.filter((_, i) => i !== idx));
