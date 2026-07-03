@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, FileText, Loader2, Check, CircleCheck, Trash2 } from 'lucide-react';
+import { Download, FileText, Loader2, Check, CircleCheck, Trash2, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,8 @@ export function ReportTable({
   const [toDelete, setToDelete] = useState<Report | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
   const isAdmin = role === 'SUPER_ADMIN';
   const isStaff = role === 'SUPER_ADMIN' || role === 'UPLOADER';
@@ -50,6 +52,21 @@ export function ReportTable({
       }
     } finally {
       setDownloading(null);
+    }
+  }
+
+  async function openPreview(report: Report) {
+    setPreviewing(report.id);
+    try {
+      const res = await fetch(`/api/reports/download/${report.id}?inline=1`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setPreview({ url: data.url, name: report.file_name });
+      } else {
+        alert(data.error || 'No se pudo abrir la vista previa');
+      }
+    } finally {
+      setPreviewing(null);
     }
   }
 
@@ -152,6 +169,10 @@ export function ReportTable({
                 </TD>
                 <TD className="text-right">
                   <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openPreview(r)} disabled={previewing === r.id} title="Vista previa">
+                      {previewing === r.id ? <Loader2 className="animate-spin" size={15} /> : <Eye size={15} />}
+                      Ver
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => download(r)} disabled={downloading === r.id}>
                       {downloading === r.id ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
                       Descargar
@@ -175,6 +196,23 @@ export function ReportTable({
           })}
         </TBody>
       </Table>
+
+      <Dialog open={!!preview} onClose={() => setPreview(null)} title={preview?.name} className="max-w-4xl">
+        {preview && (
+          <div className="space-y-3">
+            <iframe
+              src={preview.url}
+              title={preview.name}
+              className="h-[70vh] w-full rounded-lg border border-slate-200"
+            />
+            <div className="flex justify-end">
+              <a href={preview.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                Abrir en pestaña nueva
+              </a>
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       <Dialog open={!!toDelete} onClose={() => setToDelete(null)} title="Eliminar reporte">
         <div className="space-y-4">

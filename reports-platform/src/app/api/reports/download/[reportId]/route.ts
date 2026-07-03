@@ -23,24 +23,30 @@ export async function GET(req: NextRequest, { params }: { params: { reportId: st
   const allowed = await canAccessFolder(session.userId, session.role, report.folder_id);
   if (!allowed) return NextResponse.json({ error: 'Sin acceso a este reporte' }, { status: 403 });
 
+  // Modo "inline" para previsualizar sin forzar descarga.
+  const inline = req.nextUrl.searchParams.get('inline') === '1';
+
   // URL firmada de corta duración (60s)
   const { data: signed, error } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(report.file_path, 60, { download: report.file_name });
+    .createSignedUrl(report.file_path, 60, inline ? undefined : { download: report.file_name });
 
   if (error || !signed) {
-    return NextResponse.json({ error: 'No se pudo generar la descarga' }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo generar el enlace' }, { status: 500 });
   }
 
-  await logAudit({
-    userId: session.userId,
-    email: session.email,
-    action: 'DOWNLOAD',
-    resourceType: 'REPORT',
-    resourceId: report.id,
-    metadata: { fileName: report.file_name, folderId: report.folder_id },
-    req,
-  });
+  // La descarga real se audita; la vista previa no infla el conteo de descargas.
+  if (!inline) {
+    await logAudit({
+      userId: session.userId,
+      email: session.email,
+      action: 'DOWNLOAD',
+      resourceType: 'REPORT',
+      resourceId: report.id,
+      metadata: { fileName: report.file_name, folderId: report.folder_id },
+      req,
+    });
+  }
 
   return NextResponse.json({ url: signed.signedUrl, fileName: report.file_name });
 }
