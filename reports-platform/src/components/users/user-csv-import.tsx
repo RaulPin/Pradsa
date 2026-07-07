@@ -20,7 +20,7 @@ interface ParsedRow {
   email: string;
   full_name: string;
   role: Role | null;
-  folderId?: string;
+  folderIds?: string[];
   bancaId?: string;
   assignment: string; // texto legible de la asignación
   error?: string;     // motivo si la fila es inválida
@@ -72,7 +72,6 @@ export function UserCsvImport({
     const full_name = (raw.full_name || '').trim();
     const role = normalizeRole(raw.role);
     const bancaCode = (raw.banca_code || '').trim().toUpperCase();
-    const folderName = (raw.folder_name || '').trim().toLowerCase();
 
     const base: ParsedRow = { email, full_name, role, assignment: '', status: 'pending' };
 
@@ -87,13 +86,23 @@ export function UserCsvImport({
 
     if (role === 'CLIENT_FOLDER') {
       const banca = bancaCode ? bancaByCode.get(bancaCode) : undefined;
-      const matches = folders.filter(
-        (f) => f.name.trim().toLowerCase() === folderName && (!banca || f.banca_id === banca.id)
-      );
-      if (matches.length === 0) return { ...base, error: `Carpeta no encontrada: "${raw.folder_name || ''}"` };
-      if (matches.length > 1) return { ...base, error: 'Carpeta ambigua: agrega banca_code' };
-      const f = matches[0];
-      return { ...base, folderId: f.id, assignment: `${f.name}${banca ? ` · ${banca.name}` : ''}` };
+      // Admite varias plazas separadas por ";" (para sub-directores de zona).
+      const wanted = (raw.folder_name || '').split(';').map((s) => s.trim()).filter(Boolean);
+      if (!wanted.length) return { ...base, error: 'Falta la carpeta (folder_name)' };
+
+      const ids: string[] = [];
+      const names: string[] = [];
+      for (const w of wanted) {
+        const matches = folders.filter(
+          (f) => f.name.trim().toLowerCase() === w.toLowerCase() && (!banca || f.banca_id === banca.id)
+        );
+        if (matches.length === 0) return { ...base, error: `Carpeta no encontrada: "${w}"` };
+        if (matches.length > 1) return { ...base, error: `Carpeta ambigua: "${w}" (agrega banca_code)` };
+        ids.push(matches[0].id);
+        names.push(matches[0].name);
+      }
+      const label = names.length > 2 ? `${names.length} plazas${banca ? ` · ${banca.name}` : ''}` : `${names.join(', ')}${banca ? ` · ${banca.name}` : ''}`;
+      return { ...base, folderIds: ids, assignment: label };
     }
 
     // SUPER_ADMIN / UPLOADER / CLIENT_FULL: acceso total, sin asignación específica
@@ -131,7 +140,7 @@ export function UserCsvImport({
         role: row.role,
         temp_password: randomPassword(),
       };
-      if (row.role === 'CLIENT_FOLDER' && row.folderId) payload.folder_ids = [row.folderId];
+      if (row.role === 'CLIENT_FOLDER' && row.folderIds?.length) payload.folder_ids = row.folderIds;
       if (row.role === 'CLIENT_BANCA' && row.bancaId) payload.banca_ids = [row.bancaId];
 
       try {
@@ -175,7 +184,7 @@ export function UserCsvImport({
           <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-slate-500">
             <li><b>role</b>: coordinador / gas / administrativo / admin / cargador / cliente</li>
             <li><b>banca_code</b>: PYME o SUCURSALES (para administrativos y coordinadores/GAS)</li>
-            <li><b>folder_name</b>: nombre de la plaza (solo para coordinador/GAS)</li>
+            <li><b>folder_name</b>: nombre de la plaza (coordinador/GAS). Para varias plazas, sepáralas con <code>;</code></li>
           </ul>
         </div>
 
