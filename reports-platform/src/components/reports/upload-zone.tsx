@@ -18,17 +18,28 @@ interface QueueItem {
   error?: string;
 }
 
-export function UploadZone() {
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [folderId, setFolderId] = useState('');
+type FolderOption = Folder & { banca_name?: string | null };
+
+export function UploadZone({
+  lockedFolderId,
+  lockedFolderName,
+  onUploaded,
+}: {
+  lockedFolderId?: string;
+  lockedFolderName?: string;
+  onUploaded?: () => void;
+} = {}) {
+  const [folders, setFolders] = useState<FolderOption[]>([]);
+  const [folderId, setFolderId] = useState(lockedFolderId || '');
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
+    if (lockedFolderId) return; // carga fija a una carpeta: no hace falta el listado
     fetch('/api/folders')
       .then((r) => r.json())
       .then((d) => setFolders(d.folders || []));
-  }, []);
+  }, [lockedFolderId]);
 
   // Recibe todos los archivos (aceptados y rechazados por el dropzone) para
   // que SIEMPRE entren a la lista con un motivo visible, en vez de rechazarse
@@ -98,6 +109,7 @@ export function UploadZone() {
     }
 
     setUploading(false);
+    onUploaded?.();
   }
 
   const pendingCount = queue.filter((i) => i.status === 'pending').length;
@@ -107,17 +119,24 @@ export function UploadZone() {
     <div className="space-y-5">
       <Card>
         <CardContent className="space-y-4 py-5">
-          <div>
-            <Label>Carpeta de destino</Label>
-            <Select value={folderId} onChange={(e) => setFolderId(e.target.value)} className="max-w-md">
-              <option value="">Selecciona una carpeta…</option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.region_code ? `[${f.region_code}] ` : ''}{f.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+          {lockedFolderId ? (
+            <div>
+              <Label>Carpeta de destino</Label>
+              <p className="text-sm font-medium text-slate-800">{lockedFolderName}</p>
+            </div>
+          ) : (
+            <div>
+              <Label>Carpeta de destino</Label>
+              <Select value={folderId} onChange={(e) => setFolderId(e.target.value)} className="max-w-md">
+                <option value="">Selecciona una carpeta…</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.banca_name ? `${f.banca_name} · ` : ''}{f.region_code ? `[${f.region_code}] ` : ''}{f.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
 
           <div
             {...getRootProps()}

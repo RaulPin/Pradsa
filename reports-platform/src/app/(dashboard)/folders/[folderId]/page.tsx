@@ -7,6 +7,8 @@ import { canAccessFolder } from '@/lib/permissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ReportTable } from '@/components/reports/report-table';
+import { FolderUploadPanel } from '@/components/reports/folder-upload-panel';
+import { bancaColor } from '@/lib/banca-colors';
 import type { Report } from '@/types';
 
 export default async function FolderDetailPage({ params }: { params: { folderId: string } }) {
@@ -19,6 +21,10 @@ export default async function FolderDetailPage({ params }: { params: { folderId:
   const supabase = createServiceClient();
   const { data: folder } = await supabase.from('folders').select('*').eq('id', params.folderId).maybeSingle();
   if (!folder) notFound();
+
+  const { data: banca } = folder.banca_id
+    ? await supabase.from('bancas').select('code, name').eq('id', folder.banca_id).maybeSingle()
+    : { data: null };
 
   const { data: reports } = await supabase
     .from('reports')
@@ -56,18 +62,30 @@ export default async function FolderDetailPage({ params }: { params: { folderId:
         <ChevronLeft size={16} /> Volver a carpetas
       </Link>
 
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-navy">
-          <FolderClosed size={24} />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{folder.name}</h1>
-            {folder.region_code && <Badge tone="slate">{folder.region_code}</Badge>}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-navy">
+            <FolderClosed size={24} />
           </div>
-          {folder.description && <p className="text-sm text-slate-500">{folder.description}</p>}
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{folder.name}</h1>
+              {banca && (
+                <span
+                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white"
+                  style={{ backgroundColor: bancaColor(banca.code) }}
+                >
+                  {banca.name}
+                </span>
+              )}
+              {folder.region_code && <Badge tone="slate">{folder.region_code}</Badge>}
+            </div>
+            {folder.description && <p className="text-sm text-slate-500">{folder.description}</p>}
+          </div>
         </div>
       </div>
+
+      {isStaff && <FolderUploadPanel folderId={folder.id} folderName={folder.name} />}
 
       <Card>
         <CardHeader><CardTitle>Reportes ({reportList.length})</CardTitle></CardHeader>
