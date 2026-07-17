@@ -5,10 +5,10 @@ import { logAudit } from '@/lib/audit';
 
 const BUCKET = 'reports';
 
-// DELETE: eliminar un reporte (archivo + registro). Solo el administrador general.
+// DELETE: eliminar un reporte (archivo + registro). Administrador general o Cargador.
 export async function DELETE(req: NextRequest, { params }: { params: { reportId: string } }) {
   const session = getSession();
-  if (!session || session.role !== 'SUPER_ADMIN') {
+  if (!session || !['SUPER_ADMIN', 'UPLOADER'].includes(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 

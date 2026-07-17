@@ -32,7 +32,6 @@ export function ReportTable({
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
-  const isAdmin = role === 'SUPER_ADMIN';
   const isStaff = role === 'SUPER_ADMIN' || role === 'UPLOADER';
 
   async function download(report: Report) {
@@ -177,7 +176,7 @@ export function ReportTable({
                       {downloading === r.id ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
                       Descargar
                     </Button>
-                    {isAdmin && (
+                    {isStaff && (
                       <Button
                         size="sm"
                         variant="outline"
