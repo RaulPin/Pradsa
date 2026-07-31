@@ -3,8 +3,9 @@
 // reciben un color de la paleta de respaldo según su orden.
 
 const BY_CODE: Record<string, string> = {
-  PYME: '#9b1c31',       // vino / carmesí (acento de marca)
-  SUCURSALES: '#1d335a', // azul marino
+  PYME: '#9b1c31',          // vino / carmesí (acento de marca)
+  SUCURSALES: '#1d335a',    // azul marino
+  TRANSACCIONAL: '#0d9488', // verde azulado (teal)
 };
 
 const FALLBACK = ['#0891b2', '#7c3aed', '#ea580c', '#16a34a', '#db2777', '#0d9488'];
