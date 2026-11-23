@@ -1,0 +1,158 @@
+/* ── Expediente ─────────────────────────────────────────── */
+.exp-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Header */
+.exp-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.exp-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: .6rem;
+}
+
+.exp-folio {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(59,130,246,.1);
+  border: 1px solid rgba(59,130,246,.3);
+  border-radius: 4px;
+  padding: .2rem .55rem;
+  white-space: nowrap;
+}
+
+.exp-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.exp-badges { display: flex; gap: .5rem; margin-bottom: 1rem; }
+
+.exp-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .6rem .75rem;
+}
+
+.exp-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.exp-meta-label {
+  font-size: .75rem;
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.exp-meta-item > span:last-child {
+  font-size: .9rem;
+}
+
+/* Secciones */
+.exp-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+}
+
+.exp-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 1rem;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.exp-empty { color: var(--muted); font-size: .88rem; }
+
+/* Video */
+.exp-video {
+  width: 100%;
+  max-width: 800px;
+  border-radius: var(--radius-sm);
+  background: #000;
+  display: block;
+}
+
+/* Fotos */
+.exp-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: .75rem;
+}
+
+.exp-photo-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-input);
+}
+
+.exp-photo-card img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  display: block;
+}
+
+.exp-photo-meta {
+  padding: .35rem .55rem;
+  font-size: .72rem;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge-count {
+  background: rgba(59,130,246,.15);
+  color: var(--primary);
+  font-size: .75rem;
+  margin-left: .4rem;
+}
+
+/* Cuestionario status */
+.exp-q-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.exp-q-label { font-size: .9rem; }
+
+.exp-q-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+/* Notas */
+.exp-notes {
+  white-space: pre-wrap;
+  font-size: .9rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+@media (max-width: 600px) {
+  .exp-photos-grid { grid-template-columns: repeat(2, 1fr); }
+  .exp-q-status { flex-direction: column; align-items: flex-start; }
+}

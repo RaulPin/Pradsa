@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>FieldCheck – Unirme a entrevista</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<!-- body sin clase: las pantallas pre/post-llamada usan join-page, la llamada es full-screen -->
+<body>
+
+  <!-- ══════════════ PRE-LLAMADA & POST-LLAMADA (tarjetas centradas) ══════════ -->
+  <div class="join-page" id="join-page-wrapper">
+    <div class="join-wrapper">
+
+      <div class="join-brand">
+        <div class="logo-mark">FC</div>
+        <div>
+          <div class="logo-name">FieldCheck</div>
+          <div class="logo-sub">Entrevista de crédito en línea</div>
+        </div>
+      </div>
+
+      <!-- PASO 0: Validando -->
+      <div id="screen-loading" class="join-card">
+        <div class="spinner"></div>
+        <p>Verificando enlace de entrevista…</p>
+      </div>
+
+      <!-- PASO 1: Error -->
+      <div id="screen-error" class="join-card" hidden>
+        <div class="big-icon">❌</div>
+        <h2>Enlace inválido</h2>
+        <p id="error-message" class="muted"></p>
+      </div>
+
+      <!-- PASO 2: Permisos -->
+      <div id="screen-permissions" class="join-card" hidden>
+        <h2 id="interview-title-display" style="font-size:1.1rem;margin-bottom:.25rem;"></h2>
+        <p class="muted" style="font-size:.875rem;">Para participar necesitas otorgar los siguientes permisos:</p>
+
+        <div class="permissions-list">
+          <div class="perm-item" id="perm-camera">
+            <div class="perm-icon">📹</div>
+            <div class="perm-info">
+              <strong>Cámara</strong>
+              <span>Para que el entrevistador pueda verte</span>
+            </div>
+            <div class="perm-status" id="status-camera">Pendiente</div>
+          </div>
+          <div class="perm-item" id="perm-mic">
+            <div class="perm-icon">🎤</div>
+            <div class="perm-info">
+              <strong>Micrófono</strong>
+              <span>Para que el entrevistador pueda escucharte</span>
+            </div>
+            <div class="perm-status" id="status-mic">Pendiente</div>
+          </div>
+          <div class="perm-item" id="perm-location">
+            <div class="perm-icon">📍</div>
+            <div class="perm-info">
+              <strong>Ubicación GPS</strong>
+              <span>Requerida para verificar tu dirección declarada</span>
+            </div>
+            <div class="perm-status" id="status-location">Pendiente</div>
+          </div>
+        </div>
+
+        <div id="declared-address-box" class="address-box" hidden>
+          <p class="address-label">Dirección declarada:</p>
+          <p id="declared-address" class="address-value"></p>
+        </div>
+
+        <div id="location-mismatch" class="alert alert-warning" hidden>
+          ⚠️ Tu ubicación difiere de la dirección declarada. El entrevistador será notificado.
+        </div>
+
+        <div id="perm-error" class="alert alert-error" hidden></div>
+
+        <button id="btn-request-perms" class="btn btn-primary btn-full">
+          Solicitar permisos e ingresar
+        </button>
+        <p class="perm-note">⚠️ <strong>Todos los permisos son obligatorios.</strong></p>
+      </div>
+
+      <!-- PASO 3: Sala de espera -->
+      <div id="screen-waiting" class="join-card" hidden>
+        <h3 style="font-size:1rem;">Sala de espera</h3>
+        <p class="muted" style="font-size:.875rem;">Tu cámara está lista. El entrevistador te admitirá en breve.</p>
+
+        <div class="preview-wrap" style="position:relative;">
+          <video id="preview-video" playsinline autoplay muted></video>
+          <!-- Botón voltear cámara en espera -->
+          <button id="btn-flip-waiting" class="btn-flip-cam" title="Cambiar cámara" hidden>
+            🔄
+          </button>
+        </div>
+
+        <div class="spinner" style="margin-top:.5rem;"></div>
+      </div>
+
+      <!-- PASO 5: Llamada finalizada -->
+      <div id="screen-ended" class="join-card" hidden>
+        <div class="big-icon">✅</div>
+        <h2>Entrevista finalizada</h2>
+        <p class="muted" id="ended-message">La sesión ha concluido. Gracias por tu participación.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════ EN LLAMADA (full-screen) ══════════════════════════════════ -->
+  <div id="screen-call" class="join-call" hidden>
+
+    <header class="call-header">
+      <div class="call-brand">
+        <span class="logo-mark sm">FC</span>
+        <span id="join-call-title" class="call-title"></span>
+      </div>
+      <div class="call-meta">
+        <span id="join-timer" class="call-timer">00:00</span>
+        <span id="join-conn-status" class="conn-dot connecting"></span>
+      </div>
+    </header>
+
+    <div id="join-status-bar" class="status-bar" hidden></div>
+
+    <!-- Área de video: remote full-screen + local PIP -->
+    <div class="join-video-area">
+      <div class="video-cell join-remote-full" id="join-remote-cell">
+        <video id="join-remote-video" playsinline autoplay></video>
+        <span class="video-label">Entrevistador</span>
+        <div class="video-placeholder" id="join-remote-placeholder">
+          <div class="avatar-icon">👤</div>
+          <p>Conectando…</p>
+        </div>
+      </div>
+
+      <!-- PIP local (arrastrable igual que el entrevistador) -->
+      <div class="video-cell local-cell" id="join-local-cell">
+        <video id="join-local-video" playsinline autoplay muted></video>
+        <span class="video-label">Tú</span>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="call-controls join-controls">
+      <button id="join-btn-mute" class="ctrl-btn">
+        <span class="ctrl-icon">🎤</span>
+        <span class="ctrl-label">Silenciar</span>
+      </button>
+      <button id="join-btn-video" class="ctrl-btn">
+        <span class="ctrl-icon">📹</span>
+        <span class="ctrl-label">Cámara</span>
+      </button>
+      <button id="join-btn-flip" class="ctrl-btn" title="Cambiar entre cámara frontal y trasera">
+        <span class="ctrl-icon">🔄</span>
+        <span class="ctrl-label">Voltear</span>
+      </button>
+      <button id="join-btn-end" class="ctrl-btn ctrl-danger">
+        <span class="ctrl-icon">📵</span>
+        <span class="ctrl-label">Finalizar</span>
+      </button>
+    </div>
+
+  </div>
+
+  <script src="/assets/join.js" type="module"></script>
+</body>
+</html>
